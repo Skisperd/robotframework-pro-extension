@@ -37,6 +37,7 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
     }
 
     protected initializeRequest(response: DebugProtocol.InitializeResponse, _args: DebugProtocol.InitializeRequestArguments): void {
+        
         response.body = response.body || {};
 
         response.body.supportsConfigurationDoneRequest = true;
@@ -80,28 +81,56 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
 
         robotArgs.push(target);
 
+        // Send initial header to Debug Console
+        this.sendEvent(new OutputEvent(`\n${'='.repeat(80)}\n`, 'console'));
+        this.sendEvent(new OutputEvent(`Robot Framework Debug Session\n`, 'console'));
+        this.sendEvent(new OutputEvent(`${'='.repeat(80)}\n`, 'console'));
+        this.sendEvent(new OutputEvent(`Python: ${python}\n`, 'console'));
+        this.sendEvent(new OutputEvent(`Target: ${target}\n`, 'console'));
+        this.sendEvent(new OutputEvent(`Working Directory: ${cwd}\n`, 'console'));
+        this.sendEvent(new OutputEvent(`Command: ${python} ${robotArgs.join(' ')}\n`, 'console'));
+        this.sendEvent(new OutputEvent(`${'='.repeat(80)}\n\n`, 'console'));
+
         // Spawn robot process
         this._robotProcess = spawn(python, robotArgs, {
             cwd: cwd,
-            env: { ...process.env, ...args.env }
+            env: { ...process.env, ...args.env },
+            shell: false
         });
 
+        // Capture stdout
         this._robotProcess.stdout?.on('data', (data) => {
-            this.sendEvent(new OutputEvent(data.toString(), 'stdout'));
+            const text = data.toString();
+            this.sendEvent(new OutputEvent(text, 'stdout'));
+            this.sendEvent(new OutputEvent(text, 'console'));
         });
 
+        // Capture stderr
         this._robotProcess.stderr?.on('data', (data) => {
-            this.sendEvent(new OutputEvent(data.toString(), 'stderr'));
+            const text = data.toString();
+            this.sendEvent(new OutputEvent(text, 'stderr'));
+            this.sendEvent(new OutputEvent(text, 'console'));
         });
 
+        // Handle process exit
         this._robotProcess.on('exit', (code) => {
-            this.sendEvent(new OutputEvent(`\nRobot Framework exited with code ${code}\n`, 'console'));
-            this.sendEvent(new TerminatedEvent());
+            this.sendEvent(new OutputEvent(`\n${'='.repeat(80)}\n`, 'console'));
+            this.sendEvent(new OutputEvent(`Robot Framework exited with code ${code}\n`, 'console'));
+            this.sendEvent(new OutputEvent(`${'='.repeat(80)}\n\n`, 'console'));
+            
+            setTimeout(() => {
+                this.sendEvent(new TerminatedEvent());
+            }, 100);
         });
 
+        // Handle process errors
         this._robotProcess.on('error', (err) => {
-            this.sendEvent(new OutputEvent(`Error: ${err.message}\n`, 'stderr'));
-            this.sendEvent(new TerminatedEvent());
+            this.sendEvent(new OutputEvent(`\nERROR: ${err.message}\n`, 'console'));
+            this.sendEvent(new OutputEvent(`${'='.repeat(80)}\n\n`, 'console'));
+            
+            setTimeout(() => {
+                this.sendEvent(new TerminatedEvent());
+            }, 100);
         });
 
         if (args.stopOnEntry) {

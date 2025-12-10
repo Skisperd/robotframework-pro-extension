@@ -22,6 +22,17 @@ Verify installation:
 robot --version
 ```
 
+### Install Material Icon Theme (Recomendado)
+
+Para uma experiência visual profissional:
+```bash
+code --install-extension PKief.material-icon-theme
+```
+
+Depois ative:
+1. `Ctrl+Shift+P` → `Preferences: File Icon Theme`
+2. Selecione: **Material Icon Theme**
+
 ## Step 2: Build the Extension
 
 ### Option A: From Source (Development)

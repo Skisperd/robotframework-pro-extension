@@ -352,6 +352,21 @@ connection.onDocumentSymbol((params: DocumentSymbolParams): DocumentSymbol[] => 
     return symbols;
 });
 
+// Definition handler (empty - feature not implemented yet)
+connection.onDefinition((_params) => {
+    return null;
+});
+
+// References handler (empty - feature not implemented yet)
+connection.onReferences((_params) => {
+    return null;
+});
+
+// Hover handler (empty - feature not implemented yet)
+connection.onHover((_params) => {
+    return null;
+});
+
 // Make the text document manager listen on the connection
 documents.listen(connection);
 

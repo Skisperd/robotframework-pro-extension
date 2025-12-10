@@ -3,9 +3,9 @@
   "displayName": "Robot Framework Pro",
   "description": "Complete Robot Framework extension with debugging, code analysis, formatting, execution and Material theme",
   "version": "1.0.0",
-  "publisher": "your-publisher-name",
+  "publisher": "robotframework-pro",
   "author": {
-    "name": "Your Name"
+    "name": "Robot Framework Pro Team"
   },
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -128,6 +128,28 @@
       {
         "command": "robotframework.restartLanguageServer",
         "title": "Restart Language Server",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.showReport",
+        "title": "Show Test Report",
+        "category": "Robot Framework",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "robotframework.showLog",
+        "title": "Show Test Log",
+        "category": "Robot Framework",
+        "icon": "$(output)"
+      },
+      {
+        "command": "robotframework.organizeImports",
+        "title": "Organize Imports",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.reindexWorkspace",
+        "title": "Reindex Workspace",
         "category": "Robot Framework"
       }
     ],

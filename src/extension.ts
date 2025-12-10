@@ -4,12 +4,29 @@ import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } f
 import { TestRunner } from './testRunner/testRunner';
 import { DebugConfigurationProvider } from './debugAdapter/debugConfigProvider';
 import { RobotFrameworkTestController } from './testExplorer/testController';
+import { KeywordIndexer } from './languageServer/keywordIndexer';
+import { RobotDefinitionProvider } from './languageServer/definitionProvider';
+import { RobotReferencesProvider } from './languageServer/referencesProvider';
+import { RobotHoverProvider } from './languageServer/hoverProvider';
+import { RobotSignatureHelpProvider } from './languageServer/signatureHelpProvider';
+import { RobotCompletionProvider } from './languageServer/completionProvider';
+import { RobotRenameProvider } from './languageServer/renameProvider';
+import { RobocopIntegration } from './languageServer/robocopIntegration';
+import { ReportViewerProvider } from './reportViewer/reportViewer';
+import { ImportCodeActionProvider, RemoveUnusedImportsCodeAction } from './languageServer/importManager';
+import { MultiRootWorkspaceManager } from './workspace/workspaceManager';
 
 let client: LanguageClient;
 let testRunner: TestRunner;
 // @ts-ignore - testController is used for its side effects (registering test explorer)
 let testController: RobotFrameworkTestController;
 let outputChannel: vscode.OutputChannel;
+let keywordIndexer: KeywordIndexer;
+// @ts-ignore - robocopIntegration will be used for future diagnostics integration
+let robocopIntegration: RobocopIntegration;
+// @ts-ignore - reportViewer is used for report viewing commands
+let reportViewer: ReportViewerProvider;
+let workspaceManager: MultiRootWorkspaceManager;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('Robot Framework Pro extension is now active!');
@@ -17,6 +34,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // Create output channel
     outputChannel = vscode.window.createOutputChannel('Robot Framework');
     context.subscriptions.push(outputChannel);
+
+    // Initialize multi-root workspace manager
+    workspaceManager = new MultiRootWorkspaceManager(context);
+    await workspaceManager.initialize();
+
+    // Initialize keyword indexer (for backward compatibility with single workspace)
+    keywordIndexer = new KeywordIndexer();
+    robocopIntegration = new RobocopIntegration();
+    reportViewer = new ReportViewerProvider(context);
+
+    // Index workspace
+    await indexWorkspace();
+
+    // Register language feature providers
+    registerLanguageFeatureProviders(context);
 
     // Initialize test runner
     testRunner = new TestRunner(outputChannel);
@@ -35,6 +67,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     // Register formatters
     registerFormatters(context);
+
+    // Watch for file changes to update index
+    watchFileChanges(context);
 
     // Show welcome message on first install
     showWelcomeMessage(context);
@@ -179,6 +214,62 @@ function registerCommands(context: vscode.ExtensionContext): void {
             }
         })
     );
+
+    // Show Report command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.showReport', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('No workspace folder open');
+                return;
+            }
+
+            const found = await ReportViewerProvider.findAndShowRecentReport(workspaceFolder, 'report');
+            if (!found) {
+                vscode.window.showInformationMessage('No report.html found. Run tests first!');
+            }
+        })
+    );
+
+    // Show Log command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.showLog', async () => {
+            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+            if (!workspaceFolder) {
+                vscode.window.showErrorMessage('No workspace folder open');
+                return;
+            }
+
+            const found = await ReportViewerProvider.findAndShowRecentReport(workspaceFolder, 'log');
+            if (!found) {
+                vscode.window.showInformationMessage('No log.html found. Run tests first!');
+            }
+        })
+    );
+
+    // Organize Imports command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.organizeImports', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'robotframework') {
+                vscode.window.showErrorMessage('No Robot Framework file is active');
+                return;
+            }
+
+            await vscode.commands.executeCommand('editor.action.sourceAction', {
+                kind: vscode.CodeActionKind.SourceOrganizeImports.value,
+                apply: 'first'
+            });
+        })
+    );
+
+    // Reindex Workspace command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.reindexWorkspace', async () => {
+            await workspaceManager.reindexAll();
+            vscode.window.showInformationMessage('Robot Framework workspace re-indexed');
+        })
+    );
 }
 
 function registerDebugger(context: vscode.ExtensionContext): void {
@@ -234,6 +325,116 @@ function registerFormatters(context: vscode.ExtensionContext): void {
     }
 }
 
+async function indexWorkspace(): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        return;
+    }
+
+    for (const folder of workspaceFolders) {
+        await keywordIndexer.indexWorkspace(folder);
+    }
+}
+
+function registerLanguageFeatureProviders(context: vscode.ExtensionContext): void {
+    const selector: vscode.DocumentSelector = { language: 'robotframework', scheme: 'file' };
+
+    // Go to Definition
+    context.subscriptions.push(
+        vscode.languages.registerDefinitionProvider(
+            selector,
+            new RobotDefinitionProvider(keywordIndexer)
+        )
+    );
+
+    // Find References
+    context.subscriptions.push(
+        vscode.languages.registerReferenceProvider(
+            selector,
+            new RobotReferencesProvider(keywordIndexer)
+        )
+    );
+
+    // Hover Documentation
+    context.subscriptions.push(
+        vscode.languages.registerHoverProvider(
+            selector,
+            new RobotHoverProvider(keywordIndexer)
+        )
+    );
+
+    // Signature Help
+    context.subscriptions.push(
+        vscode.languages.registerSignatureHelpProvider(
+            selector,
+            new RobotSignatureHelpProvider(keywordIndexer),
+            ' ', '\t' // Trigger characters
+        )
+    );
+
+    // Enhanced Completion
+    context.subscriptions.push(
+        vscode.languages.registerCompletionItemProvider(
+            selector,
+            new RobotCompletionProvider(keywordIndexer),
+            ' ', '\t', '{', '$', '@', '&' // Trigger characters
+        )
+    );
+
+    // Rename Refactoring
+    context.subscriptions.push(
+        vscode.languages.registerRenameProvider(
+            selector,
+            new RobotRenameProvider(keywordIndexer)
+        )
+    );
+
+    // Import Management - Code Actions
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider(
+            selector,
+            new ImportCodeActionProvider(keywordIndexer),
+            {
+                providedCodeActionKinds: [
+                    vscode.CodeActionKind.QuickFix,
+                    vscode.CodeActionKind.SourceOrganizeImports
+                ]
+            }
+        )
+    );
+
+    // Remove Unused Imports - Code Action
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider(
+            selector,
+            new RemoveUnusedImportsCodeAction(keywordIndexer),
+            {
+                providedCodeActionKinds: [vscode.CodeActionKind.Source]
+            }
+        )
+    );
+}
+
+function watchFileChanges(context: vscode.ExtensionContext): void {
+    // Watch for file changes to update index
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.{robot,resource}');
+
+    watcher.onDidCreate(async (uri) => {
+        await keywordIndexer.indexFile(uri);
+    });
+
+    watcher.onDidChange(async (uri) => {
+        keywordIndexer.clearFile(uri);
+        await keywordIndexer.indexFile(uri);
+    });
+
+    watcher.onDidDelete((uri) => {
+        keywordIndexer.clearFile(uri);
+    });
+
+    context.subscriptions.push(watcher);
+}
+
 function showWelcomeMessage(context: vscode.ExtensionContext): void {
     const key = 'robotframework.welcomeShown';
     const shown = context.globalState.get<boolean>(key, false);
@@ -245,7 +446,7 @@ function showWelcomeMessage(context: vscode.ExtensionContext): void {
             'Documentation'
         ).then(selection => {
             if (selection === 'Get Started') {
-                vscode.env.openExternal(vscode.Uri.parse('https://github.com/your-username/robotframework-pro#readme'));
+                vscode.env.openExternal(vscode.Uri.parse('https://github.com/Skisperd/robotframework-pro-extension'));
             } else if (selection === 'Documentation') {
                 vscode.env.openExternal(vscode.Uri.parse('https://robotframework.org'));
             }
