@@ -1,0 +1,410 @@
+{
+  "name": "robotframework-pro",
+  "displayName": "Robot Framework Pro",
+  "description": "Complete Robot Framework extension with debugging, code analysis, formatting, execution and Material theme",
+  "version": "1.0.0",
+  "publisher": "your-publisher-name",
+  "author": {
+    "name": "Your Name"
+  },
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Formatters",
+    "Linters",
+    "Testing",
+    "Themes"
+  ],
+  "keywords": [
+    "robot framework",
+    "robotframework",
+    "robot",
+    "testing",
+    "test automation",
+    "rpa",
+    "debug",
+    "debugger",
+    "format",
+    "formatter"
+  ],
+  "activationEvents": [
+    "onLanguage:robotframework",
+    "workspaceContains:**/*.robot",
+    "workspaceContains:**/*.resource",
+    "onDebug",
+    "onCommand:robotframework.run",
+    "onCommand:robotframework.debug"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "robotframework",
+        "aliases": [
+          "Robot Framework",
+          "robotframework"
+        ],
+        "extensions": [
+          ".robot",
+          ".resource"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./resources/robot-icon.svg",
+          "dark": "./resources/robot-icon.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "robotframework",
+        "scopeName": "source.robot",
+        "path": "./syntaxes/robotframework.tmLanguage.json"
+      }
+    ],
+    "themes": [
+      {
+        "label": "Robot Framework Material Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/material-dark.json"
+      },
+      {
+        "label": "Robot Framework Material Light",
+        "uiTheme": "vs",
+        "path": "./themes/material-light.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "robotframework.run",
+        "title": "Run Robot Framework Test",
+        "category": "Robot Framework",
+        "icon": "$(play)"
+      },
+      {
+        "command": "robotframework.runFile",
+        "title": "Run Current Test File",
+        "category": "Robot Framework",
+        "icon": "$(play)"
+      },
+      {
+        "command": "robotframework.runSuite",
+        "title": "Run Test Suite",
+        "category": "Robot Framework",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "robotframework.debug",
+        "title": "Debug Robot Framework Test",
+        "category": "Robot Framework",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "robotframework.debugFile",
+        "title": "Debug Current Test File",
+        "category": "Robot Framework",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "robotframework.format",
+        "title": "Format Robot Framework File",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.showOutput",
+        "title": "Show Output",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.clearCache",
+        "title": "Clear Language Server Cache",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.restartLanguageServer",
+        "title": "Restart Language Server",
+        "category": "Robot Framework"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceLangId == robotframework",
+          "command": "robotframework.runFile",
+          "group": "robotframework@1"
+        },
+        {
+          "when": "resourceLangId == robotframework",
+          "command": "robotframework.debugFile",
+          "group": "robotframework@2"
+        },
+        {
+          "when": "resourceLangId == robotframework",
+          "command": "robotframework.format",
+          "group": "robotframework@3"
+        }
+      ],
+      "editor/title/run": [
+        {
+          "when": "resourceLangId == robotframework",
+          "command": "robotframework.runFile",
+          "group": "navigation@1"
+        },
+        {
+          "when": "resourceLangId == robotframework",
+          "command": "robotframework.debugFile",
+          "group": "navigation@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "when": "resourceExtname == .robot",
+          "command": "robotframework.runFile",
+          "group": "robotframework@1"
+        },
+        {
+          "when": "resourceExtname == .robot",
+          "command": "robotframework.debugFile",
+          "group": "robotframework@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "robotframework.runFile",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "resourceLangId == robotframework"
+      },
+      {
+        "command": "robotframework.debugFile",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "resourceLangId == robotframework"
+      },
+      {
+        "command": "robotframework.format",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "resourceLangId == robotframework"
+      }
+    ],
+    "configuration": {
+      "title": "Robot Framework Pro",
+      "properties": {
+        "robotframework.python.executable": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python executable"
+        },
+        "robotframework.robot.executable": {
+          "type": "string",
+          "default": "robot",
+          "description": "Path to Robot Framework executable"
+        },
+        "robotframework.language.server.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable the language server"
+        },
+        "robotframework.language.server.trace": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace level for language server communication"
+        },
+        "robotframework.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable code completion"
+        },
+        "robotframework.completion.filterText": {
+          "type": "boolean",
+          "default": true,
+          "description": "Filter completion items based on typed text"
+        },
+        "robotframework.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable diagnostics"
+        },
+        "robotframework.diagnostics.level": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ],
+          "default": "warning",
+          "description": "Minimum diagnostic level to show"
+        },
+        "robotframework.formatting.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable code formatting"
+        },
+        "robotframework.formatting.lineLength": {
+          "type": "number",
+          "default": 120,
+          "description": "Maximum line length for formatting"
+        },
+        "robotframework.formatting.spaceCount": {
+          "type": "number",
+          "default": 4,
+          "description": "Number of spaces for indentation"
+        },
+        "robotframework.formatting.usePipes": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use pipe-separated format"
+        },
+        "robotframework.debug.port": {
+          "type": "number",
+          "default": 5678,
+          "description": "Port for debug adapter"
+        },
+        "robotframework.debug.stopOnEntry": {
+          "type": "boolean",
+          "default": false,
+          "description": "Stop on entry when debugging"
+        },
+        "robotframework.execution.arguments": {
+          "type": "array",
+          "default": [],
+          "description": "Additional arguments for robot execution"
+        },
+        "robotframework.execution.showOutputOnRun": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show output panel when running tests"
+        },
+        "robotframework.execution.clearOutputBeforeRun": {
+          "type": "boolean",
+          "default": true,
+          "description": "Clear output before running tests"
+        }
+      }
+    },
+    "debuggers": [
+      {
+        "type": "robotframework",
+        "label": "Robot Framework",
+        "program": "./out/debugAdapter/debugAdapter.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "target"
+            ],
+            "properties": {
+              "target": {
+                "type": "string",
+                "description": "Absolute path to a test file or directory",
+                "default": "${file}"
+              },
+              "arguments": {
+                "type": "array",
+                "description": "Additional Robot Framework arguments",
+                "default": []
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch",
+                "default": false
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Absolute path to the working directory",
+                "default": "${workspaceFolder}"
+              },
+              "env": {
+                "type": "object",
+                "description": "Environment variables",
+                "default": {}
+              },
+              "python": {
+                "type": "string",
+                "description": "Path to Python executable",
+                "default": "python"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "robotframework",
+            "request": "launch",
+            "name": "Robot Framework: Launch",
+            "target": "${file}",
+            "cwd": "${workspaceFolder}",
+            "stopOnEntry": false
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Robot Framework: Launch",
+            "description": "A new configuration for debugging a Robot Framework test",
+            "body": {
+              "type": "robotframework",
+              "request": "launch",
+              "name": "Robot Framework: Launch",
+              "target": "^\"\\${file}\"",
+              "cwd": "^\"\\${workspaceFolder}\"",
+              "stopOnEntry": false
+            }
+          }
+        ]
+      }
+    ],
+    "snippets": [
+      {
+        "language": "robotframework",
+        "path": "./snippets/robotframework.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.55.0",
+    "typescript": "^5.3.3",
+    "@vscode/vsce": "^2.22.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11",
+    "vscode-debugadapter": "^1.51.0",
+    "vscode-debugprotocol": "^1.51.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/robotframework-pro"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/robotframework-pro/issues"
+  },
+  "homepage": "https://github.com/your-username/robotframework-pro#readme"
+}
