@@ -1,0 +1,204 @@
+{
+  "Test Case": {
+    "prefix": "test",
+    "body": [
+      "${1:Test Name}",
+      "    [Documentation]    ${2:Test documentation}",
+      "    [Tags]    ${3:tag1}",
+      "    ${4:Log}    ${5:Test message}",
+      "    $0"
+    ],
+    "description": "Create a new test case"
+  },
+  "Keyword": {
+    "prefix": "keyword",
+    "body": [
+      "${1:Keyword Name}",
+      "    [Documentation]    ${2:Keyword documentation}",
+      "    [Arguments]    ${3:\\${arg1\\}}",
+      "    ${4:Log}    ${5:\\${arg1\\}}",
+      "    [Return]    ${6:\\${result\\}}",
+      "    $0"
+    ],
+    "description": "Create a new keyword"
+  },
+  "For Loop": {
+    "prefix": "for",
+    "body": [
+      "FOR    \\${${1:item}}    IN    @{${2:list}}",
+      "    ${3:Log}    \\${${1:item}}",
+      "END"
+    ],
+    "description": "Create a FOR loop"
+  },
+  "For Loop Range": {
+    "prefix": "forrange",
+    "body": [
+      "FOR    \\${${1:index}}    IN RANGE    ${2:10}",
+      "    ${3:Log}    \\${${1:index}}",
+      "END"
+    ],
+    "description": "Create a FOR loop with range"
+  },
+  "If": {
+    "prefix": "if",
+    "body": [
+      "IF    ${1:condition}",
+      "    ${2:Log}    ${3:Message}",
+      "END"
+    ],
+    "description": "Create an IF statement"
+  },
+  "If Else": {
+    "prefix": "ifelse",
+    "body": [
+      "IF    ${1:condition}",
+      "    ${2:Log}    ${3:True branch}",
+      "ELSE",
+      "    ${4:Log}    ${5:False branch}",
+      "END"
+    ],
+    "description": "Create an IF-ELSE statement"
+  },
+  "If Else If": {
+    "prefix": "ifelif",
+    "body": [
+      "IF    ${1:condition1}",
+      "    ${2:Log}    ${3:First branch}",
+      "ELSE IF    ${4:condition2}",
+      "    ${5:Log}    ${6:Second branch}",
+      "ELSE",
+      "    ${7:Log}    ${8:Default branch}",
+      "END"
+    ],
+    "description": "Create an IF-ELSE IF-ELSE statement"
+  },
+  "Try Except": {
+    "prefix": "try",
+    "body": [
+      "TRY",
+      "    ${1:Log}    ${2:Trying something}",
+      "EXCEPT",
+      "    ${3:Log}    ${4:Error occurred}",
+      "FINALLY",
+      "    ${5:Log}    ${6:Cleanup}",
+      "END"
+    ],
+    "description": "Create a TRY-EXCEPT block"
+  },
+  "Settings Section": {
+    "prefix": "settings",
+    "body": [
+      "*** Settings ***",
+      "Documentation     ${1:Suite documentation}",
+      "Library           ${2:Library}",
+      "Resource          ${3:resource.resource}",
+      "$0"
+    ],
+    "description": "Create Settings section"
+  },
+  "Variables Section": {
+    "prefix": "variables",
+    "body": [
+      "*** Variables ***",
+      "\\${${1:VARIABLE}}    ${2:value}",
+      "@{${3:LIST}}        ${4:item1}    ${5:item2}",
+      "&{${6:DICT}}        ${7:key}=${8:value}",
+      "$0"
+    ],
+    "description": "Create Variables section"
+  },
+  "Test Cases Section": {
+    "prefix": "testcases",
+    "body": [
+      "*** Test Cases ***",
+      "${1:Test Name}",
+      "    [Documentation]    ${2:Test documentation}",
+      "    ${3:Log}    ${4:Test message}",
+      "$0"
+    ],
+    "description": "Create Test Cases section"
+  },
+  "Keywords Section": {
+    "prefix": "keywords",
+    "body": [
+      "*** Keywords ***",
+      "${1:Keyword Name}",
+      "    [Documentation]    ${2:Keyword documentation}",
+      "    [Arguments]    ${3:\\${arg1\\}}",
+      "    ${4:Log}    ${5:\\${arg1\\}}",
+      "$0"
+    ],
+    "description": "Create Keywords section"
+  },
+  "Log": {
+    "prefix": "log",
+    "body": "Log    ${1:message}",
+    "description": "Log a message"
+  },
+  "Should Be Equal": {
+    "prefix": "shouldbe",
+    "body": "Should Be Equal    ${1:first}    ${2:second}",
+    "description": "Assert equality"
+  },
+  "Should Contain": {
+    "prefix": "shouldcontain",
+    "body": "Should Contain    ${1:container}    ${2:item}",
+    "description": "Assert container contains item"
+  },
+  "Run Keyword If": {
+    "prefix": "runkeywordif",
+    "body": "Run Keyword If    ${1:condition}    ${2:keyword}    ${3:args}",
+    "description": "Run keyword conditionally"
+  },
+  "Wait Until Keyword Succeeds": {
+    "prefix": "waituntil",
+    "body": "Wait Until Keyword Succeeds    ${1:retry}    ${2:retry_interval}    ${3:keyword}    ${4:args}",
+    "description": "Wait until keyword succeeds"
+  },
+  "Documentation": {
+    "prefix": "doc",
+    "body": "[Documentation]    ${1:Documentation text}",
+    "description": "Add documentation"
+  },
+  "Tags": {
+    "prefix": "tags",
+    "body": "[Tags]    ${1:tag1}    ${2:tag2}",
+    "description": "Add tags"
+  },
+  "Setup": {
+    "prefix": "setup",
+    "body": "[Setup]    ${1:keyword}",
+    "description": "Add setup"
+  },
+  "Teardown": {
+    "prefix": "teardown",
+    "body": "[Teardown]    ${1:keyword}",
+    "description": "Add teardown"
+  },
+  "Arguments": {
+    "prefix": "args",
+    "body": "[Arguments]    ${1:\\${arg1\\}}    ${2:\\${arg2\\}}",
+    "description": "Add arguments"
+  },
+  "Return": {
+    "prefix": "return",
+    "body": "[Return]    ${1:\\${result\\}}",
+    "description": "Add return value"
+  },
+  "Variable": {
+    "prefix": "var",
+    "body": "\\${${1:variable}}",
+    "description": "Insert variable"
+  },
+  "List Variable": {
+    "prefix": "list",
+    "body": "@{${1:list}}",
+    "description": "Insert list variable"
+  },
+  "Dictionary Variable": {
+    "prefix": "dict",
+    "body": "&{${1:dictionary}}",
+    "description": "Insert dictionary variable"
+  }
+}

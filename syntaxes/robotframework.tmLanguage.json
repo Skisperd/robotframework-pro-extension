@@ -1,0 +1,145 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Robot Framework",
+  "scopeName": "source.robot",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#sections" },
+    { "include": "#settings" },
+    { "include": "#variables" },
+    { "include": "#keywords" },
+    { "include": "#test-cases" },
+    { "include": "#control-flow" },
+    { "include": "#built-in-keywords" },
+    { "include": "#strings" },
+    { "include": "#numbers" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.robot",
+          "match": "^\\s*#.*$"
+        },
+        {
+          "name": "comment.line.robot",
+          "match": "(?<=\\s{2,})#.*$"
+        }
+      ]
+    },
+    "sections": {
+      "patterns": [
+        {
+          "name": "keyword.control.section.robot",
+          "match": "^\\*\\*\\*\\s*(Settings|Variables|Test Cases|Tasks|Keywords|Comments)\\s*\\*\\*\\*",
+          "captures": {
+            "1": { "name": "entity.name.section.robot" }
+          }
+        }
+      ]
+    },
+    "settings": {
+      "patterns": [
+        {
+          "name": "keyword.control.settings.robot",
+          "match": "^(Library|Resource|Variables|Documentation|Metadata|Suite Setup|Suite Teardown|Test Setup|Test Teardown|Test Template|Test Timeout|Force Tags|Default Tags)(?=\\s{2,})",
+          "captures": {
+            "1": { "name": "entity.name.function.settings.robot" }
+          }
+        },
+        {
+          "name": "keyword.control.settings.robot",
+          "match": "^\\s+\\[(Documentation|Tags|Setup|Teardown|Template|Timeout|Arguments|Return)\\]",
+          "captures": {
+            "1": { "name": "entity.name.function.setting.robot" }
+          }
+        }
+      ]
+    },
+    "variables": {
+      "patterns": [
+        {
+          "name": "variable.other.robot",
+          "match": "(\\$\\{[^}]+\\}|\\@\\{[^}]+\\}|\\&\\{[^}]+\\}|\\%\\{[^}]+\\})",
+          "captures": {
+            "1": { "name": "variable.parameter.robot" }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "entity.name.function.robot",
+          "match": "^[A-Z][A-Za-z0-9 _]*(?=\\s{2,}|$)",
+          "captures": {
+            "0": { "name": "entity.name.function.keyword.robot" }
+          }
+        }
+      ]
+    },
+    "test-cases": {
+      "patterns": [
+        {
+          "name": "entity.name.function.test.robot",
+          "match": "^[A-Z][A-Za-z0-9 _]*$",
+          "captures": {
+            "0": { "name": "entity.name.function.test.robot" }
+          }
+        }
+      ]
+    },
+    "control-flow": {
+      "patterns": [
+        {
+          "name": "keyword.control.flow.robot",
+          "match": "\\b(FOR|END|IF|ELSE IF|ELSE|WHILE|CONTINUE|BREAK|RETURN|TRY|EXCEPT|FINALLY)\\b"
+        }
+      ]
+    },
+    "built-in-keywords": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.robot",
+          "match": "\\b(Log|Should Be Equal|Should Contain|Should Be True|Should Not Be Equal|Should Match Regexp|Get Variable Value|Set Variable|Run Keyword|Run Keyword If|Run Keyword And Return Status|Wait Until Keyword Succeeds|Sleep|Fail|Pass Execution|Set Test Variable|Set Suite Variable|Set Global Variable|Import Library|Import Resource|Set Log Level|Comment|No Operation)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.robot",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.robot",
+              "match": "\\\\."
+            },
+            { "include": "#variables" }
+          ]
+        },
+        {
+          "name": "string.quoted.single.robot",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.robot",
+              "match": "\\\\."
+            },
+            { "include": "#variables" }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.robot",
+          "match": "\\b\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    }
+  }
+}

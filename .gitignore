@@ -1,0 +1,16 @@
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+.DS_Store
+*.log
+.env
+.vscode/settings.json
+.claude/
+
+# Robot Framework test outputs
+.robot-test-output/
+output.xml
+log.html
+report.html
