@@ -9,6 +9,14 @@
   },
   "license": "MIT",
   "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Skisperd/robotframework-pro-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Skisperd/robotframework-pro-extension/issues"
+  },
+  "homepage": "https://github.com/Skisperd/robotframework-pro-extension#readme",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -421,12 +429,9 @@
     "vscode-debugadapter": "^1.51.0",
     "vscode-debugprotocol": "^1.51.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/robotframework-pro"
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
   },
-  "bugs": {
-    "url": "https://github.com/your-username/robotframework-pro/issues"
-  },
-  "homepage": "https://github.com/your-username/robotframework-pro#readme"
+  "qna": "marketplace"
 }

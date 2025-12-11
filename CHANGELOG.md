@@ -206,4 +206,4 @@ For detailed release notes and upgrade instructions, see the [README](README.md)
 
 ## Feedback
 
-Please report issues and feature requests at: https://github.com/your-username/robotframework-pro/issues
+Please report issues and feature requests at: https://github.com/Skisperd/robotframework-pro-extension/issues
