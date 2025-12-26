@@ -257,7 +257,7 @@ export class ImportCodeActionProvider implements vscode.CodeActionProvider {
 
 export class RemoveUnusedImportsCodeAction implements vscode.CodeActionProvider {
     constructor(_indexer: KeywordIndexer) {
-        // indexer will be used in future for detecting unused imports
+        // indexer parameter reserved for future use
     }
 
     provideCodeActions(
@@ -266,32 +266,202 @@ export class RemoveUnusedImportsCodeAction implements vscode.CodeActionProvider 
         _context: vscode.CodeActionContext,
         _token: vscode.CancellationToken
     ): vscode.ProviderResult<(vscode.CodeAction | vscode.Command)[]> {
-        const action = new vscode.CodeAction(
-            'Remove Unused Imports',
-            vscode.CodeActionKind.Source
-        );
+        const actions: vscode.CodeAction[] = [];
 
-        const edit = this.removeUnusedImports(document);
-        if (!edit) {
-            return [];
+        // Analyze document for unused imports
+        const unusedImports = this.findUnusedImports(document);
+        
+        if (unusedImports.length > 0) {
+            const action = new vscode.CodeAction(
+                `Remove ${unusedImports.length} Unused Import${unusedImports.length > 1 ? 's' : ''}`,
+                vscode.CodeActionKind.Source
+            );
+
+            action.edit = this.createRemoveImportsEdit(document, unusedImports);
+            action.diagnostics = [];
+            actions.push(action);
         }
 
-        action.edit = edit;
-        return [action];
+        // Always add "Organize Imports" action
+        const organizeAction = new vscode.CodeAction(
+            'Organize and Clean Imports',
+            vscode.CodeActionKind.SourceOrganizeImports
+        );
+        
+        const cleanEdit = this.createCleanImportsEdit(document);
+        if (cleanEdit) {
+            organizeAction.edit = cleanEdit;
+            actions.push(organizeAction);
+        }
+
+        return actions;
     }
 
-    private removeUnusedImports(document: vscode.TextDocument): vscode.WorkspaceEdit | null {
+    /**
+     * Find unused imports in the document
+     */
+    private findUnusedImports(document: vscode.TextDocument): ImportInfo[] {
+        const unusedImports: ImportInfo[] = [];
         const text = document.getText();
         const lines = text.split('\n');
 
         // Find settings section
         let settingsStart = -1;
+        let settingsEnd = -1;
 
         for (let i = 0; i < lines.length; i++) {
             const trimmed = lines[i].trim();
 
             if (trimmed.startsWith('***') && trimmed.toLowerCase().includes('setting')) {
                 settingsStart = i;
+            } else if (settingsStart >= 0 && trimmed.startsWith('***')) {
+                settingsEnd = i;
+                break;
+            }
+        }
+
+        if (settingsStart < 0) {
+            return [];
+        }
+
+        const endLine = settingsEnd >= 0 ? settingsEnd : lines.length;
+
+        // Extract Library and Resource imports
+        const imports: ImportInfo[] = [];
+        for (let i = settingsStart + 1; i < endLine; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith('Library')) {
+                const libMatch = trimmed.match(/^Library\s+(\S+)/);
+                if (libMatch) {
+                    imports.push({
+                        type: 'library',
+                        name: libMatch[1],
+                        line: i,
+                        fullLine: line
+                    });
+                }
+            } else if (trimmed.startsWith('Resource')) {
+                const resMatch = trimmed.match(/^Resource\s+(\S+)/);
+                if (resMatch) {
+                    imports.push({
+                        type: 'resource',
+                        name: resMatch[1],
+                        line: i,
+                        fullLine: line
+                    });
+                }
+            }
+        }
+
+        // Get content after settings section
+        const contentAfterSettings = lines.slice(endLine).join('\n');
+
+        // Check each import for usage
+        for (const imp of imports) {
+            const isUsed = this.isImportUsed(imp, contentAfterSettings);
+            if (!isUsed) {
+                unusedImports.push(imp);
+            }
+        }
+
+        return unusedImports;
+    }
+
+    /**
+     * Check if an import is used in the content
+     */
+    private isImportUsed(imp: ImportInfo, content: string): boolean {
+        if (imp.type === 'library') {
+            // For libraries, check if any keyword from the library is used
+            // Check for qualified keyword calls (Library.Keyword)
+            const libName = imp.name.split('/').pop()?.split('.')[0] || imp.name;
+            const qualifiedPattern = new RegExp(`\\b${this.escapeRegex(libName)}\\.\\w+`, 'i');
+            if (qualifiedPattern.test(content)) {
+                return true;
+            }
+
+            // Check for common library keywords (simplified check)
+            // This is a basic heuristic - a complete solution would require parsing the library
+            const commonLibraryKeywords: Record<string, string[]> = {
+                'Collections': ['Append To List', 'Get From Dictionary', 'List Should Contain'],
+                'String': ['Convert To Lower Case', 'Convert To Upper Case', 'Split String'],
+                'OperatingSystem': ['File Should Exist', 'Create File', 'Get File'],
+                'DateTime': ['Get Current Date', 'Convert Date', 'Add Time To Date'],
+                'Process': ['Run Process', 'Start Process', 'Terminate Process'],
+                'XML': ['Parse Xml', 'Get Element', 'Element Should Exist'],
+                'Browser': ['Open Browser', 'Close Browser', 'Click Element'],
+                'SeleniumLibrary': ['Open Browser', 'Close Browser', 'Click Element'],
+                'RequestsLibrary': ['Create Session', 'GET Request', 'POST Request']
+            };
+
+            const keywords = commonLibraryKeywords[libName];
+            if (keywords) {
+                for (const keyword of keywords) {
+                    if (content.toLowerCase().includes(keyword.toLowerCase())) {
+                        return true;
+                    }
+                }
+            }
+
+            // Conservative: if we can't determine, assume it's used
+            return true;
+        } else {
+            // For resources, check if any keyword from the resource is used
+            // This requires the indexer to know what keywords come from what file
+            const resourcePath = imp.name;
+            const resourceName = resourcePath.split(/[/\\]/).pop()?.replace('.resource', '').replace('.robot', '') || '';
+
+            // Check for qualified calls
+            const qualifiedPattern = new RegExp(`\\b${this.escapeRegex(resourceName)}\\.\\w+`, 'i');
+            if (qualifiedPattern.test(content)) {
+                return true;
+            }
+
+            // Conservative: if we can't determine, assume it's used
+            return true;
+        }
+    }
+
+    /**
+     * Create edit to remove unused imports
+     */
+    private createRemoveImportsEdit(document: vscode.TextDocument, imports: ImportInfo[]): vscode.WorkspaceEdit {
+        const edit = new vscode.WorkspaceEdit();
+
+        // Sort by line number descending to avoid offset issues
+        const sortedImports = [...imports].sort((a, b) => b.line - a.line);
+
+        for (const imp of sortedImports) {
+            const range = new vscode.Range(
+                new vscode.Position(imp.line, 0),
+                new vscode.Position(imp.line + 1, 0)
+            );
+            edit.delete(document.uri, range);
+        }
+
+        return edit;
+    }
+
+    /**
+     * Create edit to clean and organize imports
+     */
+    private createCleanImportsEdit(document: vscode.TextDocument): vscode.WorkspaceEdit | null {
+        const text = document.getText();
+        const lines = text.split('\n');
+
+        // Find settings section
+        let settingsStart = -1;
+        let settingsEnd = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
+
+            if (trimmed.startsWith('***') && trimmed.toLowerCase().includes('setting')) {
+                settingsStart = i;
+            } else if (settingsStart >= 0 && trimmed.startsWith('***')) {
+                settingsEnd = i;
                 break;
             }
         }
@@ -300,11 +470,103 @@ export class RemoveUnusedImportsCodeAction implements vscode.CodeActionProvider 
             return null;
         }
 
-        const edit = new vscode.WorkspaceEdit();
+        const endLine = settingsEnd >= 0 ? settingsEnd : lines.length;
 
-        // For now, we just mark it as available
-        // Full implementation would require analyzing which imports are actually used
+        // Extract and categorize imports
+        const libraries: string[] = [];
+        const resources: string[] = [];
+        const variables: string[] = [];
+        const otherSettings: string[] = [];
+
+        for (let i = settingsStart + 1; i < endLine; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith('Library')) {
+                libraries.push(this.normalizeImportLine(line, 'Library'));
+            } else if (trimmed.startsWith('Resource')) {
+                resources.push(this.normalizeImportLine(line, 'Resource'));
+            } else if (trimmed.startsWith('Variables')) {
+                variables.push(this.normalizeImportLine(line, 'Variables'));
+            } else if (trimmed !== '' && !trimmed.startsWith('#')) {
+                otherSettings.push(line);
+            }
+        }
+
+        // Sort imports alphabetically (case-insensitive)
+        libraries.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        resources.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        variables.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+
+        // Remove duplicates
+        const uniqueLibraries = [...new Set(libraries)];
+        const uniqueResources = [...new Set(resources)];
+        const uniqueVariables = [...new Set(variables)];
+
+        // Build organized section
+        const organized: string[] = [];
+
+        if (uniqueLibraries.length > 0) {
+            organized.push(...uniqueLibraries);
+        }
+
+        if (uniqueResources.length > 0) {
+            if (uniqueLibraries.length > 0) {
+                organized.push('');
+            }
+            organized.push(...uniqueResources);
+        }
+
+        if (uniqueVariables.length > 0) {
+            if (uniqueLibraries.length > 0 || uniqueResources.length > 0) {
+                organized.push('');
+            }
+            organized.push(...uniqueVariables);
+        }
+
+        if (otherSettings.length > 0) {
+            if (uniqueLibraries.length > 0 || uniqueResources.length > 0 || uniqueVariables.length > 0) {
+                organized.push('');
+            }
+            organized.push(...otherSettings);
+        }
+
+        // Create edit
+        const edit = new vscode.WorkspaceEdit();
+        const range = new vscode.Range(
+            new vscode.Position(settingsStart + 1, 0),
+            new vscode.Position(endLine, 0)
+        );
+
+        edit.replace(document.uri, range, organized.join('\n') + '\n');
 
         return edit;
     }
+
+    /**
+     * Normalize import line formatting
+     */
+    private normalizeImportLine(line: string, type: string): string {
+        const trimmed = line.trim();
+        const match = trimmed.match(new RegExp(`^${type}\\s+(.+)$`));
+        if (match) {
+            const importPath = match[1].trim();
+            return `${type}    ${importPath}`;
+        }
+        return trimmed;
+    }
+
+    private escapeRegex(str: string): string {
+        return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+}
+
+/**
+ * Import information interface
+ */
+interface ImportInfo {
+    type: 'library' | 'resource' | 'variables';
+    name: string;
+    line: number;
+    fullLine: string;
 }

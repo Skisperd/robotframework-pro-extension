@@ -3,6 +3,32 @@ import * as path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
 
+// ANSI color codes for terminal output
+const colors = {
+    reset: '\x1b[0m',
+    bold: '\x1b[1m',
+    dim: '\x1b[2m',
+    // Foreground colors
+    red: '\x1b[31m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    blue: '\x1b[34m',
+    magenta: '\x1b[35m',
+    cyan: '\x1b[36m',
+    white: '\x1b[37m',
+    gray: '\x1b[90m',
+    // Bright colors
+    brightRed: '\x1b[91m',
+    brightGreen: '\x1b[92m',
+    brightYellow: '\x1b[93m',
+    brightBlue: '\x1b[94m',
+    brightCyan: '\x1b[96m',
+    // Background colors
+    bgRed: '\x1b[41m',
+    bgGreen: '\x1b[42m',
+    bgYellow: '\x1b[43m',
+};
+
 export class TestExecutor {
     private currentProcess: ChildProcess | undefined;
     private outputChannel: vscode.OutputChannel;
@@ -14,7 +40,8 @@ export class TestExecutor {
     async runTest(
         test: vscode.TestItem,
         run: vscode.TestRun,
-        token: vscode.CancellationToken
+        token: vscode.CancellationToken,
+        debugMode: boolean = false
     ): Promise<void> {
         // Mark test as enqueued
         run.enqueued(test);
@@ -28,30 +55,31 @@ export class TestExecutor {
         // Mark test as started
         run.started(test);
 
-        // Append initial output
-        run.appendOutput(`\r\nRunning test: ${test.label}\r\n`);
-        run.appendOutput(`File: ${test.uri?.fsPath}\r\n`);
-        run.appendOutput('─'.repeat(80) + '\r\n');
+        // Append initial output with colors
+        const modeLabel = debugMode ? `${colors.magenta}[DEBUG MODE]${colors.reset} ` : '';
+        run.appendOutput(`\r\n${modeLabel}${colors.brightCyan}${colors.bold}Running test: ${test.label}${colors.reset}\r\n`);
+        run.appendOutput(`${colors.gray}File: ${test.uri?.fsPath}${colors.reset}\r\n`);
+        run.appendOutput(`${colors.cyan}${'─'.repeat(80)}${colors.reset}\r\n`);
 
         try {
-            const result = await this.executeTest(test, run, token);
+            const result = await this.executeTest(test, run, token, debugMode);
 
             if (token.isCancellationRequested) {
                 run.skipped(test);
                 return;
             }
 
-            // Append final output
-            run.appendOutput('─'.repeat(80) + '\r\n');
+            // Append final output with colors
+            run.appendOutput(`${colors.cyan}${'─'.repeat(80)}${colors.reset}\r\n`);
 
             // Update test result based on execution
             if (result.passed) {
-                run.appendOutput(`✓ Test passed (${result.duration}ms)\r\n\r\n`);
+                run.appendOutput(`${colors.brightGreen}${colors.bold}✓ Test passed${colors.reset} ${colors.gray}(${result.duration}ms)${colors.reset}\r\n\r\n`);
                 run.passed(test, result.duration);
             } else {
-                run.appendOutput(`✗ Test failed (${result.duration}ms)\r\n`);
+                run.appendOutput(`${colors.brightRed}${colors.bold}✗ Test failed${colors.reset} ${colors.gray}(${result.duration}ms)${colors.reset}\r\n`);
                 if (result.message) {
-                    run.appendOutput(`Error: ${result.message}\r\n\r\n`);
+                    run.appendOutput(`${colors.red}Error: ${result.message}${colors.reset}\r\n\r\n`);
                 }
 
                 const message = vscode.TestMessage.diff(
@@ -63,7 +91,7 @@ export class TestExecutor {
                 run.failed(test, message, result.duration);
             }
         } catch (error) {
-            run.appendOutput(`\r\n✗ Error: ${error instanceof Error ? error.message : String(error)}\r\n\r\n`);
+            run.appendOutput(`\r\n${colors.brightRed}${colors.bold}✗ Error:${colors.reset} ${colors.red}${error instanceof Error ? error.message : String(error)}${colors.reset}\r\n\r\n`);
             const message = new vscode.TestMessage(
                 `Error executing test: ${error instanceof Error ? error.message : String(error)}`
             );
@@ -74,7 +102,8 @@ export class TestExecutor {
     private async executeTest(
         test: vscode.TestItem,
         run: vscode.TestRun,
-        token: vscode.CancellationToken
+        token: vscode.CancellationToken,
+        debugMode: boolean = false
     ): Promise<TestResult> {
         const config = vscode.workspace.getConfiguration('robotframework');
         const pythonExecutable = config.get<string>('python.executable', 'python');
@@ -85,9 +114,31 @@ export class TestExecutor {
         }
 
         const filePath = test.uri.fsPath;
-        const testName = test.label;
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(test.uri);
         const cwd = workspaceFolder?.uri.fsPath || path.dirname(filePath);
+
+        // Determine if this is an individual test or a file item
+        // Most reliable way: check if test.id equals test.uri (file items have ID = URI)
+        const isFileItemByUri = test.uri && test.id === test.uri.toString();
+
+        // Backup checks for safety
+        const hasDoubleSeparator = test.id.includes('::');
+        const hasFileExtension = test.label.endsWith('.robot') || test.label.endsWith('.resource');
+        const hasPathSeparators = test.label.includes('\\') || test.label.includes('/');
+        const hasChildren = test.children.size > 0;
+
+        // It's a file item if ANY of these conditions are true:
+        // 1. ID equals URI (most reliable) OR
+        // 2. ID doesn't have "::" separator OR
+        // 3. Label has .robot/.resource extension OR
+        // 4. Label has path separators OR
+        // 5. Item has children
+        const isFileItem = isFileItemByUri || !hasDoubleSeparator || hasFileExtension || hasPathSeparators || hasChildren;
+
+        // Only use test name for individual tests, not for file items
+        const testName = isFileItem ? null : test.label;
+
+        this.outputChannel.appendLine(`[DEBUG] Running: id=${test.id}, label=${test.label}, isFileItem=${isFileItem}, testName=${testName || 'null'}, debugMode=${debugMode}`);
 
         // Create unique output directory for this test run
         const outputDir = path.join(cwd, '.robot-test-output', Date.now().toString());
@@ -97,7 +148,15 @@ export class TestExecutor {
             fs.mkdirSync(outputDir, { recursive: true });
         }
 
-        // Build robot command with test name filter
+        // Debug mode arguments - show all keyword executions and details
+        const debugArgs = debugMode ? [
+            '--loglevel', 'DEBUG:INFO',           // Show DEBUG level in log, INFO in console
+            '--console', 'verbose',                // Verbose console output
+            '--timestampoutputs',                  // Add timestamps to output files
+            '--debugfile', path.join(outputDir, 'debug.log'),  // Create detailed debug file
+        ] : [];
+
+        // Build robot command
         // Note: We don't use shell:true to avoid issues with spaces in test names
         const args = [
             '-m',
@@ -110,14 +169,21 @@ export class TestExecutor {
             'log.html',
             '--report',
             'report.html',
-            '--test',
-            testName,  // spawn handles spaces correctly without shell
+            ...debugArgs,
             ...additionalArgs,
+            // Only add --test filter if running an individual test
+            ...(testName ? ['--test', testName] : []),
             filePath
         ];
 
-        this.outputChannel.appendLine(`\nRunning test: ${testName}`);
-        this.outputChannel.appendLine(`Command: ${pythonExecutable} -m robot --test "${testName}" "${filePath}"`);
+        const displayName = testName || path.basename(filePath);
+        const modeStr = debugMode ? ' [DEBUG]' : '';
+        this.outputChannel.appendLine(`\nRunning${modeStr}: ${displayName}`);
+        if (testName) {
+            this.outputChannel.appendLine(`Command: ${pythonExecutable} -m robot${debugMode ? ' --loglevel DEBUG:INFO --console verbose' : ''} --test "${testName}" "${filePath}"`);
+        } else {
+            this.outputChannel.appendLine(`Command: ${pythonExecutable} -m robot${debugMode ? ' --loglevel DEBUG:INFO --console verbose' : ''} "${filePath}"`);
+        }
         this.outputChannel.appendLine(`Working directory: ${cwd}\n`);
 
         return new Promise((resolve, reject) => {
@@ -144,16 +210,17 @@ export class TestExecutor {
                 const text = data.toString();
                 output += text;
                 this.outputChannel.append(text);
-                // Send output to test run in real-time (convert \n to \r\n for VS Code)
-                run.appendOutput(text.replace(/\n/g, '\r\n'));
+                // Send colorized output to test run in real-time
+                const colorizedText = this.colorizeRobotOutput(text);
+                run.appendOutput(colorizedText.replace(/\n/g, '\r\n'));
             });
 
             this.currentProcess.stderr?.on('data', (data) => {
                 const text = data.toString();
                 errorOutput += text;
                 this.outputChannel.append(text);
-                // Send error output to test run in real-time
-                run.appendOutput(text.replace(/\n/g, '\r\n'));
+                // Send error output in red
+                run.appendOutput(`${colors.red}${text.replace(/\n/g, '\r\n')}${colors.reset}`);
             });
 
             this.currentProcess.on('exit', (code) => {
@@ -165,30 +232,40 @@ export class TestExecutor {
                 let testResult: TestResult;
 
                 try {
-                    // Try to parse text output first (more reliable for failure detection)
-                    const textResult = this.parseTextOutput(output, testName);
-                    
-                    if (textResult) {
-                        // Text output found a clear result
+                    // If running entire file (testName is null), use exit code
+                    if (testName === null) {
                         testResult = {
-                            ...textResult,
+                            passed: code === 0,
+                            message: code === 0 ? 'All tests passed' : `Tests failed with exit code ${code}`,
                             duration: duration,
                             output: output
                         };
                     } else {
-                        // Fallback to XML parsing
-                        testResult = this.parseOutputXml(outputXmlPath, testName);
-                        testResult.duration = duration;
-                        testResult.output = output;
-                        
-                        // If XML also didn't find result, use exit code
-                        if (testResult.message === 'Test result not found in output' || testResult.message === 'Output XML not found') {
+                        // Try to parse text output first (more reliable for failure detection)
+                        const textResult = this.parseTextOutput(output, testName);
+
+                        if (textResult) {
+                            // Text output found a clear result
                             testResult = {
-                                passed: code === 0,
-                                message: code === 0 ? 'Test passed' : `Test failed with exit code ${code}`,
+                                ...textResult,
                                 duration: duration,
                                 output: output
                             };
+                        } else {
+                            // Fallback to XML parsing
+                            testResult = this.parseOutputXml(outputXmlPath, testName);
+                            testResult.duration = duration;
+                            testResult.output = output;
+
+                            // If XML also didn't find result, use exit code
+                            if (testResult.message === 'Test result not found in output' || testResult.message === 'Output XML not found') {
+                                testResult = {
+                                    passed: code === 0,
+                                    message: code === 0 ? 'Test passed' : `Test failed with exit code ${code}`,
+                                    duration: duration,
+                                    output: output
+                                };
+                            }
                         }
                     }
                 } catch (parseError) {
@@ -368,6 +445,63 @@ export class TestExecutor {
             .replace(/&amp;/g, '&')
             .replace(/&quot;/g, '"')
             .replace(/&apos;/g, "'");
+    }
+
+    /**
+     * Colorize Robot Framework output for better readability
+     */
+    private colorizeRobotOutput(text: string): string {
+        let result = text;
+        
+        // Colorize PASS results
+        result = result.replace(/\| PASS \|/g, `${colors.bgGreen}${colors.bold}| PASS |${colors.reset}`);
+        result = result.replace(/(\d+ passed)/gi, `${colors.brightGreen}$1${colors.reset}`);
+        
+        // Colorize FAIL results
+        result = result.replace(/\| FAIL \|/g, `${colors.bgRed}${colors.bold}| FAIL |${colors.reset}`);
+        result = result.replace(/(\d+ failed)/gi, `${colors.brightRed}$1${colors.reset}`);
+        
+        // Colorize WARN messages
+        result = result.replace(/\[ WARN \]/g, `${colors.bgYellow}${colors.bold}[ WARN ]${colors.reset}`);
+        
+        // Colorize DEBUG messages (for debug mode)
+        result = result.replace(/\[ DEBUG \]/g, `${colors.magenta}[ DEBUG ]${colors.reset}`);
+        result = result.replace(/\[ INFO \]/g, `${colors.blue}[ INFO ]${colors.reset}`);
+        result = result.replace(/\[ ERROR \]/g, `${colors.brightRed}[ ERROR ]${colors.reset}`);
+        result = result.replace(/\[ TRACE \]/g, `${colors.gray}[ TRACE ]${colors.reset}`);
+        
+        // Colorize timestamp in verbose mode (format: YYYYMMDD HH:MM:SS.mmm)
+        result = result.replace(/^(\d{8}\s+\d{2}:\d{2}:\d{2}\.\d{3})/gm, `${colors.gray}$1${colors.reset}`);
+        
+        // Colorize keyword execution lines (starts with spaces and contains ::)
+        result = result.replace(/^(\s+)(\S+::\S+)/gm, `$1${colors.yellow}$2${colors.reset}`);
+        
+        // Colorize separator lines
+        result = result.replace(/^(=+)$/gm, `${colors.cyan}$1${colors.reset}`);
+        result = result.replace(/^(-+)$/gm, `${colors.gray}$1${colors.reset}`);
+        
+        // Colorize test/suite names in output
+        result = result.replace(/^(.*?)\.\.\./gm, `${colors.brightBlue}$1${colors.reset}...`);
+        
+        // Colorize Output/Log/Report paths
+        result = result.replace(/^(Output:)\s+(.*)$/gm, `${colors.gray}$1${colors.reset} ${colors.cyan}$2${colors.reset}`);
+        result = result.replace(/^(Log:)\s+(.*)$/gm, `${colors.gray}$1${colors.reset} ${colors.cyan}$2${colors.reset}`);
+        result = result.replace(/^(Report:)\s+(.*)$/gm, `${colors.gray}$1${colors.reset} ${colors.cyan}$2${colors.reset}`);
+        result = result.replace(/^(Debug:)\s+(.*)$/gm, `${colors.gray}$1${colors.reset} ${colors.magenta}$2${colors.reset}`);
+        
+        // Colorize common keywords
+        result = result.replace(/^(\s+)(Log|Should Be Equal|Should Contain|Should Not|Click|Wait|Open|Close|Input|Select|Get|Set|Sleep|Run Keyword|FOR|IF|ELSE|END|TRY|EXCEPT|FINALLY)/gm, 
+            `$1${colors.yellow}$2${colors.reset}`);
+        
+        // Colorize variable values in debug output (${var} = value)
+        result = result.replace(/(\$\{[^}]+\})\s*(=)\s*(.+)$/gm, 
+            `${colors.cyan}$1${colors.reset} ${colors.white}$2${colors.reset} ${colors.brightYellow}$3${colors.reset}`);
+        
+        // Colorize element locators
+        result = result.replace(/(xpath=|css=|id=|name=|class=)([^\s]+)/gi, 
+            `${colors.magenta}$1${colors.reset}${colors.brightCyan}$2${colors.reset}`);
+        
+        return result;
     }
 
     dispose(): void {

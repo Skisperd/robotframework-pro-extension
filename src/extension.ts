@@ -30,49 +30,69 @@ let workspaceManager: MultiRootWorkspaceManager;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('Robot Framework Pro extension is now active!');
+    vscode.window.showInformationMessage('Robot Framework Pro: Extension activated!');
 
     // Create output channel
     outputChannel = vscode.window.createOutputChannel('Robot Framework');
     context.subscriptions.push(outputChannel);
+    outputChannel.appendLine('Extension activation started...');
 
-    // Initialize multi-root workspace manager
-    workspaceManager = new MultiRootWorkspaceManager(context);
-    await workspaceManager.initialize();
+    try {
+        // Initialize multi-root workspace manager
+        workspaceManager = new MultiRootWorkspaceManager(context);
+        await workspaceManager.initialize();
+        outputChannel.appendLine('Workspace manager initialized');
 
-    // Initialize keyword indexer (for backward compatibility with single workspace)
-    keywordIndexer = new KeywordIndexer();
-    robocopIntegration = new RobocopIntegration();
-    reportViewer = new ReportViewerProvider(context);
+        // Initialize keyword indexer (for backward compatibility with single workspace)
+        keywordIndexer = new KeywordIndexer();
+        robocopIntegration = new RobocopIntegration();
+        reportViewer = new ReportViewerProvider(context);
 
-    // Index workspace
-    await indexWorkspace();
+        // Index workspace
+        await indexWorkspace();
+        outputChannel.appendLine('Workspace indexed');
 
-    // Register language feature providers
-    registerLanguageFeatureProviders(context);
+        // Register language feature providers
+        registerLanguageFeatureProviders(context);
+        outputChannel.appendLine('Language providers registered');
 
-    // Initialize test runner
-    testRunner = new TestRunner(outputChannel);
+        // Initialize test runner
+        testRunner = new TestRunner(outputChannel);
+        outputChannel.appendLine('Test runner initialized');
 
-    // Initialize test controller (Test Explorer)
-    testController = new RobotFrameworkTestController(context);
+        // Initialize test controller (Test Explorer)
+        testController = new RobotFrameworkTestController(context);
+        outputChannel.appendLine('Test controller initialized - Test Explorer should now be visible');
 
-    // Start language server
-    await startLanguageServer(context);
+        // Start language server
+        await startLanguageServer(context);
 
-    // Register commands
-    registerCommands(context);
+        // Register commands
+        registerCommands(context);
 
-    // Register debug configuration provider
-    registerDebugger(context);
+        // Register debug configuration provider
+        registerDebugger(context);
 
-    // Register formatters
-    registerFormatters(context);
+        // Register formatters
+        registerFormatters(context);
 
-    // Watch for file changes to update index
-    watchFileChanges(context);
+        // Watch for file changes to update index
+        watchFileChanges(context);
 
-    // Show welcome message on first install
-    showWelcomeMessage(context);
+        // Initialize Robocop integration for linting
+        await robocopIntegration.initialize();
+        context.subscriptions.push(robocopIntegration);
+
+        // Show welcome message on first install
+        showWelcomeMessage(context);
+        
+        outputChannel.appendLine('Extension fully activated!');
+        outputChannel.show();
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Failed to activate extension:', errorMessage);
+        vscode.window.showErrorMessage(`Robot Framework Pro: Activation failed - ${errorMessage}`);
+    }
 }
 
 export function deactivate(): Thenable<void> | undefined {

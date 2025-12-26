@@ -6,12 +6,12 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
+        "${workspaceFolder}",
         "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": [
         "${workspaceFolder}/out/**/*.js"
-      ],
-      "preLaunchTask": "${defaultBuildTask}"
+      ]
     },
     {
       "name": "Extension Tests",

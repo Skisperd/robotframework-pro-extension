@@ -131,7 +131,7 @@ My Custom Keyword
     [Documentation]    A custom keyword that returns its argument
     [Arguments]    ${arg}
     Log    Received argument: ${arg}
-    [Return]    ${arg}
+    RETURN    ${arg}
 
 Another Custom Keyword
     [Documentation]    Another custom keyword without arguments
@@ -146,7 +146,7 @@ Keyword With Multiple Arguments
     Log    Arg2: ${arg2}
     Log    Arg3: ${arg3}
     ${result}=    Set Variable    ${arg1}-${arg2}-${arg3}
-    [Return]    ${result}
+    RETURN    ${result}
 
 Keyword With Variable Arguments
     [Documentation]    Keyword demonstrating variable number of arguments
@@ -155,4 +155,4 @@ Keyword With Variable Arguments
         Log    Argument: ${arg}
     END
     ${count}=    Get Length    ${args}
-    [Return]    ${count}
+    RETURN    ${count}

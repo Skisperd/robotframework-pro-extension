@@ -5,7 +5,17 @@
       "Bash(tree:*)",
       "Bash(npm run compile:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Complete Robot Framework Pro Extension v1.0.0\n\nComplete Robot Framework extension with professional features:\n\nFeatures Added:\n- Test Explorer with hierarchical test display\n- Individual test execution and debugging\n- Go to Definition (F12) for keywords and variables\n- Find All References (Shift+F12)\n- Hover Documentation with formatted markdown\n- Signature Help (Ctrl+Shift+Space)\n- Advanced IntelliSense with keyword completion\n- Rename Refactoring (F2) project-wide\n- Import Management with auto-import and organize imports\n- Test Report Viewer for HTML reports and logs\n- Multi-root Workspace Support\n- Robocop Integration for linting\n- Document Symbols and Code Formatting\n- Complete syntax highlighting with Material themes\n- Code snippets for all RF structures\n\nTechnical Implementation:\n- Keyword Indexer for workspace-wide analysis\n- Language Server Protocol integration\n- Custom providers for all LSP features\n- WebView-based report viewer\n- Multi-workspace manager with per-folder configuration\n\nPackage Ready:\n- VSIX package created (123 KB)\n- README with complete documentation\n- All configurations and settings included\n- Ready for VS Code Marketplace publication\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(vsce:*)",
+      "Bash(npm install -g @vscode/vsce)",
+      "Bash(git commit:*)",
+      "Bash(git remote set-url:*)",
+      "Bash(git rm:*)",
+      "Bash(python -m robot:*)",
+      "Bash(node test-detection.js:*)",
+      "Bash(del test-detection.js)",
+      "Bash(if exist test-detection.js del test-detection.js)"
     ]
   }
 }

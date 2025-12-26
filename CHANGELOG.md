@@ -2,6 +2,36 @@
 
 All notable changes to the "Robot Framework Pro" extension will be documented in this file.
 
+## [1.1.0] - 2024-12-26
+
+### New Features
+
+#### Enhanced Test Explorer
+- **Run All Tests from File**: Fixed issue where clicking play button on a file would fail with "Suite contains no tests matching name" error
+- **Three Run Profiles**: Added Run, Debug, and Run Verbose profiles for different execution needs
+
+#### Real-time Debug Output
+- **Live Keyword Execution**: See each keyword being executed in real-time during debug sessions
+- **Colored Output**: Color-coded output in Debug Console for better readability
+  - Green for PASS
+  - Red for FAIL  
+  - Yellow for SETUP/TEARDOWN
+  - Cyan for control structures (FOR, IF, TRY)
+  - Magenta for TEST markers
+- **Smart Filtering**: Hides internal Robot Framework keywords (Log, Set Variable, etc.) for cleaner output
+- **Depth Control**: Shows only relevant keyword levels, not deep internal calls
+
+#### Test Execution Summary
+- **Results Summary**: At the end of each debug session, displays a complete summary of all tests executed
+- **Pass/Fail Counts**: Clear count of passed and failed tests
+- **Failure Details**: Detailed error messages for each failed test
+- **Test Duration**: Shows how long each test took to execute
+
+### Bug Fixes
+- Fixed file-level test detection in Test Explorer
+- Fixed Test Explorer not appearing on extension activation
+- Improved colored output compatibility with Windows terminals
+
 ## [1.0.0] - 2024-12-09
 
 ### Initial Release

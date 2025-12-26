@@ -186,6 +186,11 @@
     "body": "[Return]    ${1:\\${result\\}}",
     "description": "Add return value"
   },
+  "RETURN Statement": {
+    "prefix": "RETURN",
+    "body": "RETURN    ${1:\\${result\\}}",
+    "description": "RETURN statement (RF 5.0+)"
+  },
   "Variable": {
     "prefix": "var",
     "body": "\\${${1:variable}}",
@@ -200,5 +205,230 @@
     "prefix": "dict",
     "body": "&{${1:dictionary}}",
     "description": "Insert dictionary variable"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "WHILE    ${1:condition}    limit=${2:10}",
+      "    ${3:Log}    ${4:Loop iteration}",
+      "END"
+    ],
+    "description": "Create a WHILE loop"
+  },
+  "For In Enumerate": {
+    "prefix": "forenum",
+    "body": [
+      "FOR    \\${${1:index}}    \\${${2:item}}    IN ENUMERATE    @{${3:list}}",
+      "    ${4:Log}    \\${${1:index}}: \\${${2:item}}",
+      "END"
+    ],
+    "description": "FOR loop with index and item"
+  },
+  "For In Zip": {
+    "prefix": "forzip",
+    "body": [
+      "FOR    \\${${1:a}}    \\${${2:b}}    IN ZIP    \\${${3:list1}}    \\${${4:list2}}",
+      "    ${5:Log}    \\${${1:a}} - \\${${2:b}}",
+      "END"
+    ],
+    "description": "FOR loop over multiple lists in parallel"
+  },
+  "Try Except Else Finally": {
+    "prefix": "tryall",
+    "body": [
+      "TRY",
+      "    ${1:Keyword That May Fail}",
+      "EXCEPT    ${2:Error message}    AS    \\${${3:error}}",
+      "    ${4:Log}    Error occurred: \\${${3:error}}",
+      "ELSE",
+      "    ${5:Log}    No error occurred",
+      "FINALLY",
+      "    ${6:Log}    Cleanup",
+      "END"
+    ],
+    "description": "Complete TRY-EXCEPT-ELSE-FINALLY block"
+  },
+  "Break": {
+    "prefix": "break",
+    "body": "BREAK",
+    "description": "Break out of a loop"
+  },
+  "Continue": {
+    "prefix": "continue",
+    "body": "CONTINUE",
+    "description": "Continue to next loop iteration"
+  },
+  "VAR Assignment": {
+    "prefix": "VAR",
+    "body": "VAR    \\${${1:name}}    ${2:value}",
+    "description": "VAR statement (RF 7.0+)"
+  },
+  "VAR List": {
+    "prefix": "VARlist",
+    "body": "VAR    @{${1:name}}    ${2:item1}    ${3:item2}",
+    "description": "VAR list statement (RF 7.0+)"
+  },
+  "VAR Dict": {
+    "prefix": "VARdict",
+    "body": "VAR    &{${1:name}}    ${2:key1}=${3:value1}    ${4:key2}=${5:value2}",
+    "description": "VAR dictionary statement (RF 7.0+)"
+  },
+  "Library Import": {
+    "prefix": "lib",
+    "body": "Library    ${1:LibraryName}",
+    "description": "Import a library"
+  },
+  "Resource Import": {
+    "prefix": "res",
+    "body": "Resource    ${1:path/to/resource.resource}",
+    "description": "Import a resource file"
+  },
+  "Suite Setup": {
+    "prefix": "suitesetup",
+    "body": "Suite Setup    ${1:Keyword}",
+    "description": "Add suite setup"
+  },
+  "Suite Teardown": {
+    "prefix": "suiteteardown",
+    "body": "Suite Teardown    ${1:Keyword}",
+    "description": "Add suite teardown"
+  },
+  "Test Setup": {
+    "prefix": "testsetup",
+    "body": "Test Setup    ${1:Keyword}",
+    "description": "Add default test setup"
+  },
+  "Test Teardown": {
+    "prefix": "testteardown",
+    "body": "Test Teardown    ${1:Keyword}",
+    "description": "Add default test teardown"
+  },
+  "Test Timeout": {
+    "prefix": "timeout",
+    "body": "[Timeout]    ${1:1 minute}",
+    "description": "Add test/keyword timeout"
+  },
+  "Test Template": {
+    "prefix": "template",
+    "body": "[Template]    ${1:Keyword}",
+    "description": "Add test template"
+  },
+  "Force Tags": {
+    "prefix": "forcetags",
+    "body": "Force Tags    ${1:tag1}    ${2:tag2}",
+    "description": "Add force tags"
+  },
+  "Default Tags": {
+    "prefix": "defaulttags",
+    "body": "Default Tags    ${1:tag1}    ${2:tag2}",
+    "description": "Add default tags"
+  },
+  "Data Driven Test": {
+    "prefix": "datatest",
+    "body": [
+      "${1:Data Driven Test}",
+      "    [Template]    ${2:Keyword Template}",
+      "    ${3:arg1_value1}    ${4:arg2_value1}",
+      "    ${5:arg1_value2}    ${6:arg2_value2}",
+      "    ${7:arg1_value3}    ${8:arg2_value3}"
+    ],
+    "description": "Create a data-driven test case"
+  },
+  "BDD Given": {
+    "prefix": "given",
+    "body": "Given ${1:some precondition}",
+    "description": "BDD Given statement"
+  },
+  "BDD When": {
+    "prefix": "when",
+    "body": "When ${1:some action is taken}",
+    "description": "BDD When statement"
+  },
+  "BDD Then": {
+    "prefix": "then",
+    "body": "Then ${1:some result should occur}",
+    "description": "BDD Then statement"
+  },
+  "BDD And": {
+    "prefix": "and",
+    "body": "And ${1:another condition}",
+    "description": "BDD And statement"
+  },
+  "BDD But": {
+    "prefix": "but",
+    "body": "But ${1:an exception}",
+    "description": "BDD But statement"
+  },
+  "Complete Robot File": {
+    "prefix": "robotfile",
+    "body": [
+      "*** Settings ***",
+      "Documentation     ${1:Suite description}",
+      "Library           Collections",
+      "Library           String",
+      "Resource          ${2:common.resource}",
+      "",
+      "Suite Setup       ${3:Setup Suite}",
+      "Suite Teardown    ${4:Teardown Suite}",
+      "Test Setup        ${5:Setup Test}",
+      "Test Teardown     ${6:Teardown Test}",
+      "",
+      "*** Variables ***",
+      "\\${${7:VARIABLE}}    ${8:value}",
+      "",
+      "*** Test Cases ***",
+      "${9:Test Case Name}",
+      "    [Documentation]    ${10:Test description}",
+      "    [Tags]    ${11:smoke}",
+      "    ${12:Log}    ${13:Test message}",
+      "",
+      "*** Keywords ***",
+      "${14:Custom Keyword}",
+      "    [Documentation]    ${15:Keyword description}",
+      "    [Arguments]    \\${${16:arg1}}",
+      "    ${17:Log}    \\${${16:arg1}}",
+      "    RETURN    \\${${18:result}}"
+    ],
+    "description": "Create a complete Robot Framework file structure"
+  },
+  "Wait Until": {
+    "prefix": "waituntil",
+    "body": "Wait Until Keyword Succeeds    ${1:5x}    ${2:1s}    ${3:Keyword}    ${4:args}",
+    "description": "Wait until keyword succeeds"
+  },
+  "Run Keyword And Return Status": {
+    "prefix": "rkrs",
+    "body": "\\${${1:status}}=    Run Keyword And Return Status    ${2:Keyword}    ${3:args}",
+    "description": "Run keyword and capture status"
+  },
+  "Run Keyword And Ignore Error": {
+    "prefix": "rkie",
+    "body": "\\${${1:status}}    \\${${2:output}}=    Run Keyword And Ignore Error    ${3:Keyword}    ${4:args}",
+    "description": "Run keyword and capture error"
+  },
+  "Inline IF": {
+    "prefix": "inlineif",
+    "body": "IF    ${1:condition}    ${2:Keyword}    ${3:args}",
+    "description": "Single-line IF statement"
+  },
+  "Skip Test": {
+    "prefix": "skip",
+    "body": "Skip    ${1:Reason for skipping}",
+    "description": "Skip the current test"
+  },
+  "Skip If": {
+    "prefix": "skipif",
+    "body": "Skip If    ${1:condition}    ${2:Reason for skipping}",
+    "description": "Conditionally skip the test"
+  },
+  "Embedded Arguments Keyword": {
+    "prefix": "embedded",
+    "body": [
+      "${1:User} logs in with password ${2:password}",
+      "    [Documentation]    Keyword with embedded arguments",
+      "    Log    User: \\${${1:User}}",
+      "    Log    Password: \\${${2:password}}"
+    ],
+    "description": "Create keyword with embedded arguments"
   }
 }

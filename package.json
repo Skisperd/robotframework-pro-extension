@@ -2,7 +2,7 @@
   "name": "robotframework-pro",
   "displayName": "Robot Framework Pro",
   "description": "Complete Robot Framework extension with debugging, code analysis, formatting, execution and Material theme",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "robotframework-pro",
   "author": {
     "name": "Robot Framework Pro Team"
@@ -41,6 +41,7 @@
     "formatter"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onLanguage:robotframework",
     "workspaceContains:**/*.robot",
     "workspaceContains:**/*.resource",
@@ -321,6 +322,31 @@
           "type": "boolean",
           "default": true,
           "description": "Clear output before running tests"
+        },
+        "robotframework.robocop.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Robocop linting integration"
+        },
+        "robotframework.robocop.exclude": {
+          "type": "array",
+          "default": [],
+          "description": "List of Robocop rules to exclude (e.g., ['0201', '0202'])"
+        },
+        "robotframework.robocop.include": {
+          "type": "array",
+          "default": [],
+          "description": "List of Robocop rules to include (runs only these rules if specified)"
+        },
+        "robotframework.testExplorer.showTags": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show test tags in Test Explorer"
+        },
+        "robotframework.testExplorer.filterByTag": {
+          "type": "string",
+          "default": "",
+          "description": "Filter tests by tag pattern (e.g., 'smoke' or 'regression AND NOT slow')"
         }
       }
     },

@@ -9,12 +9,182 @@ export interface RobocopIssue {
     message: string;
 }
 
-export class RobocopIntegration {
+export class RobocopIntegration implements vscode.Disposable {
     private outputChannel: vscode.OutputChannel;
     private isRobocopAvailable: boolean | null = null;
+    private isRobotidyAvailable: boolean | null = null;
+    private diagnosticCollection: vscode.DiagnosticCollection;
+    private fileWatcher: vscode.FileSystemWatcher | undefined;
+    private lintDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('Robocop');
+        this.diagnosticCollection = vscode.languages.createDiagnosticCollection('robocop');
+    }
+
+    /**
+     * Initialize Robocop integration with file watching and auto-linting
+     */
+    async initialize(): Promise<void> {
+        const config = vscode.workspace.getConfiguration('robotframework');
+        const enableRobocop = config.get<boolean>('robocop.enabled', true);
+
+        if (!enableRobocop) {
+            this.outputChannel.appendLine('Robocop integration is disabled');
+            return;
+        }
+
+        const available = await this.checkRobocopAvailability();
+        if (!available) {
+            return;
+        }
+
+        // Also check for robotidy
+        await this.checkRobotidyAvailability();
+
+        // Set up file watcher for auto-linting
+        this.fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.{robot,resource}');
+        
+        this.fileWatcher.onDidChange(uri => this.debouncedLint(uri));
+        this.fileWatcher.onDidCreate(uri => this.debouncedLint(uri));
+
+        // Lint all open documents
+        vscode.window.visibleTextEditors.forEach(editor => {
+            if (editor.document.languageId === 'robotframework') {
+                this.lintDocument(editor.document);
+            }
+        });
+
+        // Lint on document open
+        vscode.workspace.onDidOpenTextDocument(doc => {
+            if (doc.languageId === 'robotframework') {
+                this.lintDocument(doc);
+            }
+        });
+
+        // Clear diagnostics when document is closed
+        vscode.workspace.onDidCloseTextDocument(doc => {
+            this.diagnosticCollection.delete(doc.uri);
+        });
+
+        this.outputChannel.appendLine('Robocop integration initialized');
+    }
+
+    /**
+     * Debounced lint to prevent excessive linting during rapid changes
+     */
+    private debouncedLint(uri: vscode.Uri): void {
+        const key = uri.toString();
+        const existingTimer = this.lintDebounceTimers.get(key);
+        
+        if (existingTimer) {
+            clearTimeout(existingTimer);
+        }
+
+        const timer = setTimeout(async () => {
+            this.lintDebounceTimers.delete(key);
+            try {
+                const doc = await vscode.workspace.openTextDocument(uri);
+                await this.lintDocument(doc);
+            } catch (error) {
+                // Document might have been deleted
+            }
+        }, 500);
+
+        this.lintDebounceTimers.set(key, timer);
+    }
+
+    /**
+     * Lint a document and update diagnostics
+     */
+    async lintDocument(document: vscode.TextDocument): Promise<void> {
+        if (document.languageId !== 'robotframework') {
+            return;
+        }
+
+        const issues = await this.lintFile(document.uri.fsPath);
+        const diagnostics = issues.map(issue => this.issueToDiagnostic(issue));
+        this.diagnosticCollection.set(document.uri, diagnostics);
+    }
+
+    /**
+     * Convert RobocopIssue to VS Code Diagnostic
+     */
+    private issueToDiagnostic(issue: RobocopIssue): vscode.Diagnostic {
+        const range = new vscode.Range(
+            issue.line, issue.column,
+            issue.line, issue.column + 100 // Approximate line end
+        );
+
+        let severity: vscode.DiagnosticSeverity;
+        switch (issue.severity) {
+            case 'error':
+                severity = vscode.DiagnosticSeverity.Error;
+                break;
+            case 'warning':
+                severity = vscode.DiagnosticSeverity.Warning;
+                break;
+            default:
+                severity = vscode.DiagnosticSeverity.Information;
+        }
+
+        const diagnostic = new vscode.Diagnostic(range, issue.message, severity);
+        diagnostic.source = 'robocop';
+        diagnostic.code = issue.rule;
+        return diagnostic;
+    }
+
+    /**
+     * Check if robotidy is available
+     */
+    async checkRobotidyAvailability(): Promise<boolean> {
+        if (this.isRobotidyAvailable !== null) {
+            return this.isRobotidyAvailable;
+        }
+
+        try {
+            const config = vscode.workspace.getConfiguration('robotframework');
+            const pythonPath = config.get<string>('python.executable', 'python');
+
+            const result = await this.executeCommand(pythonPath, ['-m', 'robotidy', '--version']);
+            this.isRobotidyAvailable = result.exitCode === 0;
+
+            if (this.isRobotidyAvailable) {
+                this.outputChannel.appendLine(`robotidy available: ${result.stdout.trim()}`);
+            } else {
+                this.outputChannel.appendLine('robotidy not available. Install with: pip install robotframework-tidy');
+            }
+
+            return this.isRobotidyAvailable;
+        } catch (error) {
+            this.isRobotidyAvailable = false;
+            return false;
+        }
+    }
+
+    /**
+     * Get diagnostic collection for external access
+     */
+    getDiagnosticCollection(): vscode.DiagnosticCollection {
+        return this.diagnosticCollection;
+    }
+
+    /**
+     * Clear all Robocop diagnostics
+     */
+    clearDiagnostics(): void {
+        this.diagnosticCollection.clear();
+    }
+
+    /**
+     * Manually trigger linting for all open Robot Framework files
+     */
+    async lintAllOpenFiles(): Promise<void> {
+        for (const editor of vscode.window.visibleTextEditors) {
+            if (editor.document.languageId === 'robotframework') {
+                await this.lintDocument(editor.document);
+            }
+        }
     }
 
     async checkRobocopAvailability(): Promise<boolean> {
@@ -175,5 +345,13 @@ export class RobocopIntegration {
 
     dispose(): void {
         this.outputChannel.dispose();
+        this.diagnosticCollection.dispose();
+        if (this.fileWatcher) {
+            this.fileWatcher.dispose();
+        }
+        for (const timer of this.lintDebounceTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.lintDebounceTimers.clear();
     }
 }

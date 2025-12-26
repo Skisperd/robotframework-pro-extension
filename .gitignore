@@ -7,10 +7,37 @@ node_modules
 *.log
 .env
 .vscode/settings.json
-.claude/
 
 # Robot Framework test outputs
 .robot-test-output/
 output.xml
 log.html
 report.html
+
+# AI/LLM related files - don't expose AI usage
+.claude/
+.claude_memory/
+.cursorrules
+.cursorignore
+.cursor/
+.aider*
+.aider.chat.history.md
+.aider.input.history
+.aider.tags.cache.v3/
+.continue/
+.codeium/
+.copilot/
+.github/copilot/
+CLAUDE.md
+AGENTS.md
+.ai/
+.llm/
+.gpt/
+*.prompt
+*.prompts
+.anthropic/
+.openai/
+ai-context.md
+ai-instructions.md
+llm-context.md
+copilot-instructions.md

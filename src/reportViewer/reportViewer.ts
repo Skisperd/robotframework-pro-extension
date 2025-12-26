@@ -207,6 +207,110 @@ export class ReportViewerProvider {
         `;
     }
 
+    /**
+     * Watch for report file changes and refresh the view
+     */
+    public watchReportFile(reportPath: string): vscode.Disposable {
+        const watcher = vscode.workspace.createFileSystemWatcher(reportPath);
+
+        watcher.onDidChange(async () => {
+            if (ReportViewerProvider.currentPanel) {
+                await this.loadReport(reportPath);
+            }
+        });
+
+        return watcher;
+    }
+
+    /**
+     * Show report with auto-refresh capability
+     */
+    public async showReportWithAutoRefresh(reportPath: string, reportType: 'report' | 'log' = 'report'): Promise<vscode.Disposable | undefined> {
+        await this.showReport(reportPath, reportType);
+        return this.watchReportFile(reportPath);
+    }
+
+    /**
+     * Get report statistics from output.xml
+     */
+    public static async getReportStatistics(workspaceFolder: vscode.WorkspaceFolder): Promise<ReportStatistics | null> {
+        const outputXmlPattern = '**/output.xml';
+        const files = await vscode.workspace.findFiles(
+            new vscode.RelativePattern(workspaceFolder, outputXmlPattern),
+            '**/node_modules/**',
+            10
+        );
+
+        if (files.length === 0) {
+            return null;
+        }
+
+        // Get most recent output.xml
+        const sortedFiles = await Promise.all(
+            files.map(async (file) => {
+                const stats = fs.statSync(file.fsPath);
+                return { file, mtime: stats.mtime };
+            })
+        );
+        sortedFiles.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+        try {
+            const outputXml = fs.readFileSync(sortedFiles[0].file.fsPath, 'utf-8');
+            return this.parseOutputXmlStatistics(outputXml);
+        } catch (error) {
+            console.error('Error reading output.xml:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Parse output.xml for basic statistics
+     */
+    private static parseOutputXmlStatistics(xml: string): ReportStatistics {
+        const stats: ReportStatistics = {
+            totalTests: 0,
+            passed: 0,
+            failed: 0,
+            skipped: 0,
+            elapsedTime: '',
+            startTime: '',
+            endTime: ''
+        };
+
+        // Parse total stats
+        const statsMatch = xml.match(/<statistics>[\s\S]*?<total>[\s\S]*?<stat pass="(\d+)" fail="(\d+)"[^>]*>All Tests<\/stat>/);
+        if (statsMatch) {
+            stats.passed = parseInt(statsMatch[1]);
+            stats.failed = parseInt(statsMatch[2]);
+            stats.totalTests = stats.passed + stats.failed;
+        }
+
+        // Parse skipped (RF 4.0+)
+        const skipMatch = xml.match(/skip="(\d+)"/);
+        if (skipMatch) {
+            stats.skipped = parseInt(skipMatch[1]);
+        }
+
+        // Parse timing
+        const suiteMatch = xml.match(/<suite[^>]*>[\s\S]*?<status[^>]*starttime="([^"]+)"[^>]*endtime="([^"]+)"/);
+        if (suiteMatch) {
+            stats.startTime = suiteMatch[1];
+            stats.endTime = suiteMatch[2];
+
+            // Calculate elapsed time
+            try {
+                const start = new Date(stats.startTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3T'));
+                const end = new Date(stats.endTime.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3T'));
+                const elapsed = (end.getTime() - start.getTime()) / 1000;
+                stats.elapsedTime = `${elapsed.toFixed(2)}s`;
+            } catch {
+                stats.elapsedTime = 'Unknown';
+            }
+        }
+
+        return stats;
+    }
+
     public static async findAndShowRecentReport(
         workspaceFolder: vscode.WorkspaceFolder,
         reportType: 'report' | 'log' = 'report',
@@ -250,4 +354,17 @@ export class ReportViewerProvider {
 
         return false;
     }
+}
+
+/**
+ * Report statistics interface
+ */
+export interface ReportStatistics {
+    totalTests: number;
+    passed: number;
+    failed: number;
+    skipped: number;
+    elapsedTime: string;
+    startTime: string;
+    endTime: string;
 }

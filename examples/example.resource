@@ -9,7 +9,7 @@ ${RESOURCE_VAR}    Resource Variable
 Shared Keyword
     [Documentation]    A keyword that can be used across multiple test files
     Log    This keyword is from a resource file
-    [Return]    ${RESOURCE_VAR}
+    RETURN    ${RESOURCE_VAR}
 
 Setup Keyword
     [Documentation]    Example setup keyword
