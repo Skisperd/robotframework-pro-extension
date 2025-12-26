@@ -1,137 +1,162 @@
 # Robot Framework Pro
 
-Complete Robot Framework extension for Visual Studio Code with advanced features including debugging, code analysis, formatting, test execution, and Material theme.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Skisperd/robotframework-pro-extension/main/resources/icon.png" alt="Robot Framework Pro" width="128">
+</p>
 
-## Features
+<p align="center">
+  <strong>Complete Robot Framework extension for Visual Studio Code</strong><br>
+  Debugging • Code Analysis • Test Explorer • Real-time Output • Material Theme
+</p>
 
-### Test Explorer & Execution
-- **Test Explorer** with hierarchical test display
-- Individual test execution and debugging
-- Real-time test status (passed/failed)
-- Execute tests directly from editor or explorer
-- Keyboard shortcuts for quick test execution
-
-### Language Features
-- **Go to Definition (F12)** - Navigate to keyword and variable definitions
-- **Find All References (Shift+F12)** - Find all usages of keywords and variables
-- **Hover Documentation** - See documentation on hover
-- **Signature Help (Ctrl+Shift+Space)** - View keyword arguments while typing
-- **Advanced IntelliSense** - Smart code completion with documentation
-- **Rename Refactoring (F2)** - Rename keywords and variables across the workspace
-
-### Code Quality
-- **Syntax Highlighting** - Complete Robot Framework syntax support
-- **Code Formatting** - Format your Robot Framework files
-- **Diagnostics** - Real-time error detection
-- **Robocop Integration** - Linting with Robocop
-- **Import Management** - Organize imports and auto-import keywords
-
-### Testing & Reporting
-- **Test Report Viewer** - View test reports directly in VS Code
-- **Test Log Viewer** - View test logs in VS Code
-- **Real-time Output** - See test execution output as it happens
-
-### Workspace Features
-- **Multi-root Workspace Support** - Work with multiple projects simultaneously
-- **Keyword Indexer** - Fast workspace indexing for quick navigation
-- **Document Symbols** - Outline and breadcrumb navigation
-
-### Visual
-- **Material Theme** - Beautiful dark and light themes
-- **Code Snippets** - Pre-built snippets for all Robot Framework structures
-
-## Requirements
-
-- Visual Studio Code 1.85.0 or higher
-- Python 3.8 or higher
-- Robot Framework 4.0 or higher (install with \`pip install robotframework\`)
-- (Optional) Robocop for linting (\`pip install robotframework-robocop\`)
-- (Optional) robotidy for formatting (\`pip install robotframework-tidy\`)
-
-## Extension Settings
-
-This extension contributes the following settings:
-
-### Python & Robot Framework
-* \`robotframework.python.executable\`: Path to Python executable (default: \`python\`)
-* \`robotframework.robot.executable\`: Path to Robot Framework executable (default: \`robot\`)
-
-### Language Server
-* \`robotframework.language.server.enabled\`: Enable/disable the language server (default: \`true\`)
-* \`robotframework.language.server.trace\`: Trace level for language server communication (default: \`off\`)
-
-### Code Completion
-* \`robotframework.completion.enabled\`: Enable/disable code completion (default: \`true\`)
-* \`robotframework.completion.filterText\`: Filter completion items based on typed text (default: \`true\`)
-
-### Diagnostics
-* \`robotframework.diagnostics.enabled\`: Enable/disable diagnostics (default: \`true\`)
-* \`robotframework.diagnostics.level\`: Minimum diagnostic level to show (default: \`warning\`)
-
-### Formatting
-* \`robotframework.formatting.enabled\`: Enable/disable code formatting (default: \`true\`)
-* \`robotframework.formatting.lineLength\`: Maximum line length (default: \`120\`)
-* \`robotframework.formatting.spaceCount\`: Number of spaces for indentation (default: \`4\`)
-* \`robotframework.formatting.usePipes\`: Use pipe-separated format (default: \`false\`)
-
-### Test Execution
-* \`robotframework.execution.arguments\`: Additional arguments for robot execution (default: \`[]\`)
-* \`robotframework.execution.showOutputOnRun\`: Show output panel when running tests (default: \`true\`)
-* \`robotframework.execution.clearOutputBeforeRun\`: Clear output before running tests (default: \`true\`)
-
-### Debugging
-* \`robotframework.debug.port\`: Port for debug adapter (default: \`5678\`)
-* \`robotframework.debug.stopOnEntry\`: Stop on entry when debugging (default: \`false\`)
-
-## Keyboard Shortcuts
-
-- \`Ctrl+Shift+R\` / \`Cmd+Shift+R\` - Run current test file
-- \`Ctrl+Shift+D\` / \`Cmd+Shift+D\` - Debug current test file
-- \`Ctrl+Shift+F\` / \`Cmd+Shift+F\` - Format current file
-- \`F12\` - Go to Definition
-- \`Shift+F12\` - Find All References
-- \`F2\` - Rename Symbol
-- \`Ctrl+Shift+Space\` - Signature Help
-
-## Commands
-
-All commands are available via the Command Palette (\`Ctrl+Shift+P\` / \`Cmd+Shift+P\`):
-
-- \`Robot Framework: Run Test\` - Run a single test
-- \`Robot Framework: Run Current Test File\` - Run the current file
-- \`Robot Framework: Run Test Suite\` - Run a test suite
-- \`Robot Framework: Debug Test\` - Debug a test
-- \`Robot Framework: Debug Current Test File\` - Debug the current file
-- \`Robot Framework: Format File\` - Format the current file
-- \`Robot Framework: Show Test Report\` - View the latest test report
-- \`Robot Framework: Show Test Log\` - View the latest test log
-- \`Robot Framework: Organize Imports\` - Organize imports alphabetically
-- \`Robot Framework: Reindex Workspace\` - Re-index the workspace
-- \`Robot Framework: Show Output\` - Show the output panel
-- \`Robot Framework: Clear Cache\` - Clear the language server cache
-- \`Robot Framework: Restart Language Server\` - Restart the language server
-
-## Release Notes
-
-### 1.0.0
-
-Initial release with complete feature set:
-- Test Explorer with hierarchical display
-- Go to Definition, Find References, Hover, Signature Help
-- Advanced IntelliSense with documentation
-- Rename Refactoring
-- Import Management with auto-import
-- Test Report Viewer
-- Multi-root Workspace Support
-- Robocop Integration
-- Material Dark & Light themes
-- Code Snippets for all RF structures
-- Complete syntax highlighting
-
-## License
-
-MIT License - see LICENSE file for details
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=ConnectionsSystem.robotframework-pro">
+    <img src="https://img.shields.io/visual-studio-marketplace/v/ConnectionsSystem.robotframework-pro?style=flat-square" alt="Version">
+  </a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=ConnectionsSystem.robotframework-pro">
+    <img src="https://img.shields.io/visual-studio-marketplace/i/ConnectionsSystem.robotframework-pro?style=flat-square" alt="Installs">
+  </a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=ConnectionsSystem.robotframework-pro">
+    <img src="https://img.shields.io/visual-studio-marketplace/r/ConnectionsSystem.robotframework-pro?style=flat-square" alt="Rating">
+  </a>
+</p>
 
 ---
 
-**Enjoy using Robot Framework Pro!** 🤖
+## ✨ Features
+
+### 🧪 Test Explorer & Results
+
+Run and debug your Robot Framework tests directly from VS Code's Test Explorer with colored results.
+
+![Test Results](https://raw.githubusercontent.com/Skisperd/robotframework-pro-extension/main/docs/images/test-results.png)
+
+### 🔍 Real-time Debug Output
+
+See each keyword being executed in real-time with colored output in the Debug Console.
+
+![Debug Console](https://raw.githubusercontent.com/Skisperd/robotframework-pro-extension/main/docs/images/debug-console.png)
+
+**Features:**
+- 🟢 **PASS** in green
+- 🔴 **FAIL** in red with error details
+- 🟡 **SETUP/TEARDOWN** in yellow
+- 🔵 **FOR/IF/TRY** control structures in cyan
+- Smart filtering of internal keywords (Log, Set Variable, etc.)
+
+### 🔄 Control Structures Support
+
+Full support for FOR loops, IF statements, TRY/EXCEPT with real-time iteration display.
+
+![Debug Iteration](https://raw.githubusercontent.com/Skisperd/robotframework-pro-extension/main/docs/images/debug-console-iteration.png)
+
+### 📊 Test Execution Summary
+
+At the end of each test run, see a complete summary with all results and pass/fail counts.
+
+![Test Summary](https://raw.githubusercontent.com/Skisperd/robotframework-pro-extension/main/docs/images/debug-console-results.png)
+
+---
+
+## 🚀 Quick Start
+
+1. Install the extension from the VS Code Marketplace
+2. Open a folder containing `.robot` files
+3. Open the Test Explorer (beaker icon in the sidebar)
+4. Click the play button to run tests!
+
+---
+
+## 📦 Features List
+
+### Test Explorer & Execution
+- ✅ Test Explorer with hierarchical test display
+- ✅ Run individual tests or entire files
+- ✅ Debug mode with real-time keyword output
+- ✅ Three run profiles: Run, Debug, Run Verbose
+- ✅ Real-time test status (passed/failed)
+- ✅ Test execution summary with failure details
+
+### Language Features
+- ✅ **Go to Definition (F12)** - Navigate to keyword definitions
+- ✅ **Find All References (Shift+F12)** - Find all usages
+- ✅ **Hover Documentation** - See documentation on hover
+- ✅ **Signature Help (Ctrl+Shift+Space)** - View keyword arguments
+- ✅ **Advanced IntelliSense** - Smart code completion
+- ✅ **Rename Refactoring (F2)** - Rename across workspace
+
+### Code Quality
+- ✅ Complete syntax highlighting
+- ✅ Code formatting
+- ✅ Real-time error detection
+- ✅ Robocop integration for linting
+- ✅ Import management
+
+### Reporting
+- ✅ View test reports in VS Code
+- ✅ View test logs in VS Code
+- ✅ Real-time colored output
+
+---
+
+## ⚙️ Requirements
+
+- Visual Studio Code 1.85.0+
+- Python 3.8+
+- Robot Framework 4.0+ (`pip install robotframework`)
+
+**Optional:**
+- Robocop for linting (`pip install robotframework-robocop`)
+- Robotidy for formatting (`pip install robotframework-tidy`)
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Shift+R` | Run current test file |
+| `Ctrl+Shift+D` | Debug current test file |
+| `F12` | Go to Definition |
+| `Shift+F12` | Find All References |
+| `F2` | Rename Symbol |
+| `Ctrl+Shift+Space` | Signature Help |
+
+---
+
+## 🎨 Themes
+
+Includes beautiful Material themes:
+- **Material Dark** - Dark theme for comfortable coding
+- **Material Light** - Light theme for bright environments
+
+---
+
+## 📝 Release Notes
+
+### 1.1.2 (Latest)
+- 🎨 New extension icon
+- 🐛 Fixed extension activation issues
+
+### 1.1.0
+- ✨ Real-time keyword execution in Debug Console
+- ✨ Colored output (PASS/FAIL/TEST/SUITE)
+- ✨ Smart filtering of internal keywords
+- ✨ Test execution summary with failure details
+- ✨ Three run profiles (Run, Debug, Run Verbose)
+- 🐛 Fixed "Suite contains no tests" error
+
+### 1.0.0
+- 🎉 Initial release
+
+---
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+<p align="center">
+  <strong>Enjoy using Robot Framework Pro!</strong> 🤖
+</p>
