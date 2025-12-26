@@ -9,7 +9,6 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 !out/**/*.d.ts
-node_modules/**
 .github/**
 *.vsix
 .claude/**

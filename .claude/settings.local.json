@@ -15,7 +15,9 @@
       "Bash(python -m robot:*)",
       "Bash(node test-detection.js:*)",
       "Bash(del test-detection.js)",
-      "Bash(if exist test-detection.js del test-detection.js)"
+      "Bash(if exist test-detection.js del test-detection.js)",
+      "Bash(npm run package:*)",
+      "Bash(npx vsce:*)"
     ]
   }
 }
