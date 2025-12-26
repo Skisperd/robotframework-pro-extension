@@ -2,8 +2,8 @@
   "name": "robotframework-pro",
   "displayName": "Robot Framework Pro",
   "description": "Complete Robot Framework extension with debugging, code analysis, formatting, execution and Material theme",
-  "version": "1.1.0",
-  "publisher": "robotframework-pro",
+  "version": "1.1.1",
+  "publisher": "ConnectionsSystem",
   "author": {
     "name": "Robot Framework Pro Team"
   },

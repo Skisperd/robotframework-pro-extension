@@ -59,21 +59,34 @@ export class MultiRootWorkspaceManager {
             return; // Already added
         }
 
-        // Get workspace-specific configuration
-        const config = vscode.workspace.getConfiguration('robotframework', folder.uri);
-        const pythonPath = config.get<string>('python.executable', 'python');
+        try {
+            // Get workspace-specific configuration
+            const config = vscode.workspace.getConfiguration('robotframework', folder.uri);
+            const pythonPath = config.get<string>('python.executable', 'python');
 
-        // Create indexer for this workspace
-        const indexer = new KeywordIndexer();
-        await indexer.indexWorkspace(folder);
+            // Create indexer for this workspace
+            const indexer = new KeywordIndexer();
+            
+            // Index with timeout to prevent blocking
+            const indexPromise = indexer.indexWorkspace(folder);
+            const timeoutPromise = new Promise<void>((resolve) => 
+                setTimeout(() => {
+                    console.warn(`Workspace indexing timeout for ${folder.name}`);
+                    resolve();
+                }, 15000)
+            );
+            await Promise.race([indexPromise, timeoutPromise]);
 
-        this.workspaces.set(key, {
-            folder: folder,
-            indexer: indexer,
-            pythonPath: pythonPath
-        });
+            this.workspaces.set(key, {
+                folder: folder,
+                indexer: indexer,
+                pythonPath: pythonPath
+            });
 
-        console.log(`Added workspace: ${folder.name} (Python: ${pythonPath})`);
+            console.log(`Added workspace: ${folder.name} (Python: ${pythonPath})`);
+        } catch (error) {
+            console.warn(`Failed to add workspace ${folder.name}:`, error);
+        }
     }
 
     private removeWorkspace(folder: vscode.WorkspaceFolder): void {

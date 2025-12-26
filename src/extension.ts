@@ -79,15 +79,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // Watch for file changes to update index
         watchFileChanges(context);
 
-        // Initialize Robocop integration for linting
-        await robocopIntegration.initialize();
+        // Initialize Robocop integration for linting (non-blocking)
+        robocopIntegration.initialize().then(() => {
+            outputChannel.appendLine('Robocop integration initialized');
+        }).catch((error) => {
+            outputChannel.appendLine(`Robocop initialization failed: ${error}`);
+        });
         context.subscriptions.push(robocopIntegration);
 
         // Show welcome message on first install
         showWelcomeMessage(context);
         
         outputChannel.appendLine('Extension fully activated!');
-        outputChannel.show();
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error('Failed to activate extension:', errorMessage);
@@ -106,51 +109,65 @@ async function startLanguageServer(context: vscode.ExtensionContext): Promise<vo
     const config = vscode.workspace.getConfiguration('robotframework');
 
     if (!config.get<boolean>('language.server.enabled', true)) {
+        outputChannel.appendLine('Language server disabled by configuration');
         return;
     }
 
-    // The server is implemented in node
-    const serverModule = context.asAbsolutePath(
-        path.join('out', 'languageServer', 'server.js')
-    );
+    try {
+        // The server is implemented in node
+        const serverModule = context.asAbsolutePath(
+            path.join('out', 'languageServer', 'server.js')
+        );
 
-    // The debug options for the server
-    const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
+        // The debug options for the server
+        const debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
-    // If the extension is launched in debug mode then the debug server options are used
-    // Otherwise the run options are used
-    const serverOptions: ServerOptions = {
-        run: { module: serverModule, transport: TransportKind.ipc },
-        debug: {
-            module: serverModule,
-            transport: TransportKind.ipc,
-            options: debugOptions
-        }
-    };
+        // If the extension is launched in debug mode then the debug server options are used
+        // Otherwise the run options are used
+        const serverOptions: ServerOptions = {
+            run: { module: serverModule, transport: TransportKind.ipc },
+            debug: {
+                module: serverModule,
+                transport: TransportKind.ipc,
+                options: debugOptions
+            }
+        };
 
-    // Options to control the language client
-    const clientOptions: LanguageClientOptions = {
-        // Register the server for robot framework documents
-        documentSelector: [
-            { scheme: 'file', language: 'robotframework' }
-        ],
-        synchronize: {
-            // Notify the server about file changes to '.robot' files contained in the workspace
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{robot,resource}')
-        },
-        outputChannel: outputChannel
-    };
+        // Options to control the language client
+        const clientOptions: LanguageClientOptions = {
+            // Register the server for robot framework documents
+            documentSelector: [
+                { scheme: 'file', language: 'robotframework' }
+            ],
+            synchronize: {
+                // Notify the server about file changes to '.robot' files contained in the workspace
+                fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{robot,resource}')
+            },
+            outputChannel: outputChannel
+        };
 
-    // Create the language client and start the client
-    client = new LanguageClient(
-        'robotframeworkLanguageServer',
-        'Robot Framework Language Server',
-        serverOptions,
-        clientOptions
-    );
+        // Create the language client and start the client
+        client = new LanguageClient(
+            'robotframeworkLanguageServer',
+            'Robot Framework Language Server',
+            serverOptions,
+            clientOptions
+        );
 
-    // Start the client. This will also launch the server
-    await client.start();
+        // Start the client with timeout to prevent blocking
+        const startPromise = client.start();
+        const timeoutPromise = new Promise<void>((_, reject) => 
+            setTimeout(() => reject(new Error('Language server start timeout')), 10000)
+        );
+        
+        await Promise.race([startPromise, timeoutPromise]);
+        outputChannel.appendLine('Language server started');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        outputChannel.appendLine(`Language server failed to start: ${errorMessage}`);
+        console.warn('Language server failed to start:', errorMessage);
+        // Don't throw - let extension continue without language server
+    }
 }
 
 function registerCommands(context: vscode.ExtensionContext): void {
@@ -351,8 +368,18 @@ async function indexWorkspace(): Promise<void> {
         return;
     }
 
-    for (const folder of workspaceFolders) {
-        await keywordIndexer.indexWorkspace(folder);
+    try {
+        for (const folder of workspaceFolders) {
+            // Add timeout for workspace indexing
+            const indexPromise = keywordIndexer.indexWorkspace(folder);
+            const timeoutPromise = new Promise<void>((_, reject) => 
+                setTimeout(() => reject(new Error('Workspace indexing timeout')), 30000)
+            );
+            await Promise.race([indexPromise, timeoutPromise]);
+        }
+    } catch (error) {
+        console.warn('Workspace indexing failed or timed out:', error);
+        outputChannel.appendLine(`Workspace indexing issue: ${error}`);
     }
 }
 
