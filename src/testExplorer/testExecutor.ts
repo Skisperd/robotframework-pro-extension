@@ -79,15 +79,34 @@ export class TestExecutor {
             } else {
                 run.appendOutput(`${colors.brightRed}${colors.bold}✗ Test failed${colors.reset} ${colors.gray}(${result.duration}ms)${colors.reset}\r\n`);
                 if (result.message) {
-                    run.appendOutput(`${colors.red}Error: ${result.message}${colors.reset}\r\n\r\n`);
+                    run.appendOutput(`${colors.red}Error: ${result.message}${colors.reset}\r\n`);
                 }
+                // Show Expected vs Actual in the output if available
+                if (result.expected || result.actual) {
+                    run.appendOutput(`${colors.yellow}Expected:${colors.reset} ${result.expected || '(not specified)'}\r\n`);
+                    run.appendOutput(`${colors.yellow}Actual:${colors.reset}   ${result.actual || '(not specified)'}\r\n`);
+                }
+                run.appendOutput('\r\n');
 
+                // Create diff message with Expected/Actual
                 const message = vscode.TestMessage.diff(
                     result.message || 'Test failed',
                     result.expected || '',
                     result.actual || ''
                 );
-                message.location = new vscode.Location(test.uri!, test.range!);
+                
+                // Set location to the correct line in the file
+                if (test.uri) {
+                    if (result.line && result.line > 0) {
+                        // Use the line from the XML output for more accurate error location
+                        const failurePosition = new vscode.Position(result.line - 1, 0);
+                        const failureRange = new vscode.Range(failurePosition, failurePosition);
+                        message.location = new vscode.Location(test.uri, failureRange);
+                    } else if (test.range) {
+                        // Fallback to test range
+                        message.location = new vscode.Location(test.uri, test.range);
+                    }
+                }
                 run.failed(test, message, result.duration);
             }
         } catch (error) {
@@ -393,34 +412,81 @@ export class TestExecutor {
 
             const xmlContent = fs.readFileSync(xmlPath, 'utf-8');
 
-            // Simple XML parsing (you might want to use a proper XML parser library)
-            // Look for test status in the XML
+            // Match test element with name and line attributes
+            const escapedTestName = testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const testRegex = new RegExp(
-                `<test[^>]*name="${testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*>.*?<status[^>]*status="(PASS|FAIL)"[^>]*>.*?</status>.*?</test>`,
-                's'
+                `<test[^>]*name="${escapedTestName}"[^>]*line="(\\d+)"[^>]*>([\\s\\S]*?)</test>`,
+                'i'
+            );
+            
+            // Try alternative format where line comes before name
+            const testRegexAlt = new RegExp(
+                `<test[^>]*line="(\\d+)"[^>]*name="${escapedTestName}"[^>]*>([\\s\\S]*?)</test>`,
+                'i'
             );
 
-            const match = xmlContent.match(testRegex);
+            let match = xmlContent.match(testRegex) || xmlContent.match(testRegexAlt);
+            
+            // Fallback: match without line number
+            if (!match) {
+                const testRegexNoLine = new RegExp(
+                    `<test[^>]*name="${escapedTestName}"[^>]*>([\\s\\S]*?)</test>`,
+                    'i'
+                );
+                const noLineMatch = xmlContent.match(testRegexNoLine);
+                if (noLineMatch) {
+                    match = [noLineMatch[0], '0', noLineMatch[1]];
+                }
+            }
 
             if (match) {
-                const status = match[1];
+                const testLine = parseInt(match[1]) || 0;
+                const testContent = match[2] || match[0];
+                
+                // Check test status
+                const statusMatch = testContent.match(/<status[^>]*status="(PASS|FAIL)"[^>]*>/);
+                const status = statusMatch ? statusMatch[1] : 'FAIL';
                 const passed = status === 'PASS';
 
-                // Extract failure message if test failed
                 let message = passed ? 'Test passed' : 'Test failed';
+                let expected: string | undefined;
+                let actual: string | undefined;
+                let failureLine = testLine;
+                let failedKeyword: string | undefined;
 
                 if (!passed) {
-                    const messageRegex = /<msg[^>]*>(.*?)<\/msg>/s;
-                    const messageMatch = match[0].match(messageRegex);
-                    if (messageMatch) {
-                        message = this.decodeXmlEntities(messageMatch[1]);
+                    // Find the failed keyword and extract details
+                    const failedKwResult = this.extractFailedKeywordInfo(testContent);
+                    
+                    if (failedKwResult) {
+                        message = failedKwResult.message;
+                        expected = failedKwResult.expected;
+                        actual = failedKwResult.actual;
+                        failedKeyword = failedKwResult.keywordName;
+                        
+                        // Try to find the exact line of the failed keyword in the source file
+                        const sourceFilePath = this.extractSourcePath(xmlContent);
+                        if (sourceFilePath && failedKeyword) {
+                            const keywordLine = this.findKeywordLineInFile(sourceFilePath, failedKeyword, testLine);
+                            if (keywordLine > 0) {
+                                failureLine = keywordLine;
+                            }
+                        }
+                        
+                        // Build a detailed message with line info
+                        if (failureLine > 0) {
+                            message = `[Line ${failureLine}] ${failedKeyword ? `${failedKeyword}: ` : ''}${failedKwResult.message}`;
+                        }
                     }
                 }
 
                 return {
                     passed: passed,
                     message: message,
-                    output: ''
+                    expected: expected,
+                    actual: actual,
+                    output: '',
+                    line: failureLine
                 };
             }
 
@@ -435,6 +501,214 @@ export class TestExecutor {
                 message: `Error parsing output: ${error instanceof Error ? error.message : String(error)}`,
                 output: ''
             };
+        }
+    }
+
+    /**
+     * Extract information from a failed keyword in the test content
+     */
+    private extractFailedKeywordInfo(testContent: string): { 
+        message: string; 
+        expected?: string; 
+        actual?: string; 
+        keywordName?: string; 
+    } | null {
+        try {
+            // Find keyword with FAIL status
+            const kwRegex = /<kw\s+name="([^"]+)"[^>]*>[\s\S]*?<status\s+status="FAIL"[^>]*>([^<]*)<\/status>[\s\S]*?<\/kw>/gi;
+            let kwMatch;
+            
+            while ((kwMatch = kwRegex.exec(testContent)) !== null) {
+                const keywordName = this.decodeXmlEntities(kwMatch[1]);
+                const statusMessage = this.decodeXmlEntities(kwMatch[2].trim());
+                const kwContent = kwMatch[0];
+                
+                // Extract FAIL message
+                const msgMatch = kwContent.match(/<msg[^>]*level="FAIL"[^>]*>([^<]*)<\/msg>/i);
+                const failMessage = msgMatch ? this.decodeXmlEntities(msgMatch[1].trim()) : statusMessage;
+                
+                // Extract arguments to determine expected and actual
+                const args: string[] = [];
+                const argRegex = /<arg>([^<]*)<\/arg>/gi;
+                let argMatch;
+                while ((argMatch = argRegex.exec(kwContent)) !== null) {
+                    args.push(this.decodeXmlEntities(argMatch[1]));
+                }
+                
+                // Parse expected and actual from the failure message and arguments
+                const { expected, actual } = this.parseExpectedActual(failMessage, args, keywordName);
+                
+                return {
+                    message: failMessage,
+                    expected: expected,
+                    actual: actual,
+                    keywordName: keywordName
+                };
+            }
+            
+            return null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    /**
+     * Parse Expected and Actual values from failure message and keyword arguments
+     */
+    private parseExpectedActual(
+        message: string, 
+        args: string[], 
+        keywordName: string
+    ): { expected?: string; actual?: string } {
+        let expected: string | undefined;
+        let actual: string | undefined;
+        
+        // Common patterns in Robot Framework failure messages:
+        // "45.0 != 42.0" - numeric comparison
+        // "'actual' != 'expected'" - string comparison
+        // "X should be Y" - various assertions
+        
+        // Pattern 1: "X != Y" format
+        const neqMatch = message.match(/^(.+?)\s*!=\s*(.+)$/);
+        if (neqMatch) {
+            actual = neqMatch[1].trim();
+            expected = neqMatch[2].trim();
+            return { expected, actual };
+        }
+        
+        // Pattern 2: "'X' should be equal to 'Y'" format
+        const shouldBeEqualMatch = message.match(/['"](.*?)['"].*should be equal.*['"](.*?)['"]/i);
+        if (shouldBeEqualMatch) {
+            actual = shouldBeEqualMatch[1];
+            expected = shouldBeEqualMatch[2];
+            return { expected, actual };
+        }
+        
+        // Pattern 3: "X does not contain Y" format
+        const containsMatch = message.match(/['"](.*?)['"].*does not contain.*['"](.*?)['"]/i);
+        if (containsMatch) {
+            actual = containsMatch[1];
+            expected = `Contains: ${containsMatch[2]}`;
+            return { expected, actual };
+        }
+        
+        // Pattern 4: Use keyword arguments for Should Be Equal variants
+        if (keywordName.toLowerCase().includes('should be equal') && args.length >= 2) {
+            // First arg is typically actual, second is expected
+            actual = args[0];
+            expected = args[1];
+            return { expected, actual };
+        }
+        
+        // Pattern 5: Use keyword arguments for Should Contain
+        if (keywordName.toLowerCase().includes('should contain') && args.length >= 2) {
+            actual = args[0];
+            expected = `Should contain: ${args[1]}`;
+            return { expected, actual };
+        }
+        
+        // Pattern 6: "is not true" / "is not false" for Should Be True/False
+        if (keywordName.toLowerCase().includes('should be true')) {
+            actual = 'False';
+            expected = 'True';
+            if (args.length > 0) {
+                actual = `${args[0]} evaluated to False`;
+                expected = `${args[0]} to be True`;
+            }
+            return { expected, actual };
+        }
+        
+        if (keywordName.toLowerCase().includes('should be false')) {
+            actual = 'True';
+            expected = 'False';
+            if (args.length > 0) {
+                actual = `${args[0]} evaluated to True`;
+                expected = `${args[0]} to be False`;
+            }
+            return { expected, actual };
+        }
+        
+        // Generic fallback: use message parts
+        const genericParts = message.split(/\s+(?:!=|is not|should be|expected|but was)\s+/i);
+        if (genericParts.length >= 2) {
+            actual = genericParts[0].trim().replace(/^['"]|['"]$/g, '');
+            expected = genericParts.slice(1).join(' ').trim().replace(/^['"]|['"]$/g, '');
+        }
+        
+        return { expected, actual };
+    }
+
+    /**
+     * Extract the source file path from the XML content
+     */
+    private extractSourcePath(xmlContent: string): string | null {
+        try {
+            // Look for source attribute in suite element
+            const sourceMatch = xmlContent.match(/<suite[^>]*source="([^"]+)"[^>]*>/i);
+            if (sourceMatch) {
+                return sourceMatch[1];
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Find the line number of a keyword in the source file
+     * Searches within the test case starting at testStartLine
+     */
+    private findKeywordLineInFile(filePath: string, keywordName: string, testStartLine: number): number {
+        try {
+            if (!fs.existsSync(filePath)) {
+                return 0;
+            }
+
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const lines = content.split('\n');
+            
+            // Normalize keyword name for matching (Robot Framework is case-insensitive and allows flexible spacing)
+            const normalizedKeyword = keywordName.toLowerCase().replace(/\s+/g, ' ').trim();
+            
+            // Search from the test start line onwards
+            for (let i = testStartLine - 1; i < lines.length; i++) {
+                const line = lines[i];
+                const trimmedLine = line.trim().toLowerCase();
+                
+                // Skip empty lines and comments
+                if (!trimmedLine || trimmedLine.startsWith('#')) {
+                    continue;
+                }
+                
+                // Check if we've reached the next test case or section (stop searching)
+                if (i > testStartLine && (
+                    trimmedLine.startsWith('***') || 
+                    (trimmedLine.match(/^[a-z]/) && !trimmedLine.startsWith(' ') && !trimmedLine.startsWith('\t'))
+                )) {
+                    break;
+                }
+                
+                // Normalize the line for comparison
+                // Robot Framework keywords can be called with varying whitespace
+                const normalizedLine = trimmedLine.replace(/\s+/g, ' ');
+                
+                // Check if the line contains the keyword
+                // Keywords can be at the start of the line (after spaces) or after assignment
+                if (normalizedLine.includes(normalizedKeyword)) {
+                    return i + 1; // Return 1-based line number
+                }
+                
+                // Also try matching without spaces (e.g., "ShouldBeEqual" matches "Should Be Equal")
+                const keywordNoSpaces = normalizedKeyword.replace(/\s+/g, '');
+                const lineNoSpaces = normalizedLine.replace(/\s+/g, '');
+                if (lineNoSpaces.includes(keywordNoSpaces)) {
+                    return i + 1;
+                }
+            }
+            
+            return 0;
+        } catch {
+            return 0;
         }
     }
 
@@ -519,4 +793,5 @@ interface TestResult {
     actual?: string;
     duration?: number;
     output?: string;
+    line?: number;
 }

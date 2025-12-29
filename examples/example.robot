@@ -16,7 +16,7 @@ Default Tags      robot
 
 *** Variables ***
 ${STRING_VAR}     Hello, Robot Framework!
-${NUMBER_VAR}     42
+${NUMBER_VAR}     45
 @{LIST_VAR}       item1    item2    item3
 &{DICT_VAR}       key1=value1    key2=value2
 

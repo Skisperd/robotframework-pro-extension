@@ -211,24 +211,112 @@ export class RobotFrameworkTestController {
         return tests ? Array.from(tests) : [];
     }
 
+    /**
+     * Get or create folder hierarchy items
+     */
+    private getOrCreateFolderItem(folderPath: string, workspaceFolder: vscode.WorkspaceFolder): vscode.TestItem {
+        const folderId = `folder:${folderPath}`;
+        let folderItem = this.controller.items.get(folderId);
+        
+        if (!folderItem) {
+            // Check if this is a nested folder
+            const parentPath = path.dirname(folderPath);
+            const folderName = path.basename(folderPath);
+            
+            if (parentPath && parentPath !== '.' && parentPath !== folderPath) {
+                // Create parent folder first
+                const parentItem = this.getOrCreateFolderItem(parentPath, workspaceFolder);
+                
+                // Check if folder already exists in parent
+                folderItem = parentItem.children.get(folderId);
+                if (!folderItem) {
+                    folderItem = this.controller.createTestItem(
+                        folderId,
+                        folderName,
+                        vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, folderPath))
+                    );
+                    parentItem.children.add(folderItem);
+                }
+            } else {
+                // Top-level folder, add to controller
+                folderItem = this.controller.createTestItem(
+                    folderId,
+                    folderName,
+                    vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, folderPath))
+                );
+                this.controller.items.add(folderItem);
+            }
+        }
+        
+        return folderItem;
+    }
+
     private getOrCreateFileItem(uri: vscode.Uri): vscode.TestItem {
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
         const relativePath = workspaceFolder
             ? path.relative(workspaceFolder.uri.fsPath, uri.fsPath)
             : path.basename(uri.fsPath);
 
-        let fileItem = this.controller.items.get(uri.toString());
+        const fileId = uri.toString();
+        
+        // Check if file already exists anywhere in the tree
+        let fileItem = this.findTestItem(fileId);
 
         if (!fileItem) {
+            const fileName = path.basename(relativePath);
+            const folderPath = path.dirname(relativePath);
+            
             fileItem = this.controller.createTestItem(
-                uri.toString(),
-                relativePath,
+                fileId,
+                fileName,
                 uri
             );
-            this.controller.items.add(fileItem);
+            
+            // If file is in a subfolder, create folder hierarchy
+            if (folderPath && folderPath !== '.' && workspaceFolder) {
+                const parentFolder = this.getOrCreateFolderItem(folderPath, workspaceFolder);
+                parentFolder.children.add(fileItem);
+            } else {
+                // File is in root, add directly to controller
+                this.controller.items.add(fileItem);
+            }
         }
 
         return fileItem;
+    }
+
+    /**
+     * Find a test item by ID anywhere in the tree
+     */
+    private findTestItem(id: string): vscode.TestItem | undefined {
+        // Check top-level items
+        const topLevel = this.controller.items.get(id);
+        if (topLevel) {
+            return topLevel;
+        }
+        
+        // Search in children
+        for (const [_, item] of this.controller.items) {
+            const found = this.findTestItemInChildren(item, id);
+            if (found) {
+                return found;
+            }
+        }
+        
+        return undefined;
+    }
+
+    private findTestItemInChildren(parent: vscode.TestItem, id: string): vscode.TestItem | undefined {
+        for (const [_, child] of parent.children) {
+            if (child.id === id) {
+                return child;
+            }
+            const found = this.findTestItemInChildren(child, id);
+            if (found) {
+                return found;
+            }
+        }
+        return undefined;
     }
 
     private removeTests(uri: vscode.Uri): void {
@@ -240,7 +328,51 @@ export class RobotFrameworkTestController {
                 }
             }
         }
-        this.controller.items.delete(uri.toString());
+        
+        // Find and remove the file item from wherever it is in the hierarchy
+        const fileId = uri.toString();
+        this.removeTestItemFromTree(fileId);
+    }
+
+    /**
+     * Remove a test item from anywhere in the tree
+     */
+    private removeTestItemFromTree(id: string): boolean {
+        // Check top-level items
+        if (this.controller.items.get(id)) {
+            this.controller.items.delete(id);
+            return true;
+        }
+        
+        // Search in children
+        for (const [_, item] of this.controller.items) {
+            if (this.removeTestItemFromParent(item, id)) {
+                // If parent folder is now empty, remove it too
+                if (item.children.size === 0 && item.id.startsWith('folder:')) {
+                    this.removeTestItemFromTree(item.id);
+                }
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    private removeTestItemFromParent(parent: vscode.TestItem, id: string): boolean {
+        for (const [_, child] of parent.children) {
+            if (child.id === id) {
+                parent.children.delete(id);
+                return true;
+            }
+            if (this.removeTestItemFromParent(child, id)) {
+                // If child folder is now empty, remove it too
+                if (child.children.size === 0 && child.id.startsWith('folder:')) {
+                    parent.children.delete(child.id);
+                }
+                return true;
+            }
+        }
+        return false;
     }
 
     private async runTests(
