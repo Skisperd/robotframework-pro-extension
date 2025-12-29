@@ -33,3 +33,5 @@ output.xml
 report.html
 resources/__pycache__/**
 resources/temp_test.robot
+results/**
+test_output/**

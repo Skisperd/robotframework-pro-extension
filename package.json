@@ -2,7 +2,7 @@
   "name": "robotframework-pro",
   "displayName": "Robot Framework Pro",
   "description": "Complete Robot Framework extension with debugging, code analysis, formatting, execution and Material theme",
-  "version": "1.1.9",
+  "version": "2.0.0",
   "publisher": "ConnectionsSystem",
   "author": {
     "name": "Robot Framework Pro Team"
@@ -225,6 +225,17 @@
         "when": "resourceLangId == robotframework"
       }
     ],
+    "views": {
+      "test": [
+        {
+          "id": "robotFrameworkFailures",
+          "name": "Keyword Call Stack",
+          "when": "robotframework:hasFailures",
+          "icon": "$(error)",
+          "contextualTitle": "Robot Framework Failures"
+        }
+      ]
+    },
     "configuration": {
       "title": "Robot Framework Pro",
       "properties": {

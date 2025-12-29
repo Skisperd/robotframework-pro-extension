@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import * as fs from 'fs';
+import { StackTraceFormatter, StackFrame } from './stackTraceFormatter';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -35,6 +36,17 @@ export class TestExecutor {
 
     constructor(_controller: vscode.TestController) {
         this.outputChannel = vscode.window.createOutputChannel('Robot Framework Tests');
+    }
+
+    private updateFailureTreeView(testName: string, callStack: StackFrame[]): void {
+        // Import getFailureTreeProvider dynamically to avoid circular dependency
+        const ext = require('../extension');
+        const failureTreeProvider = ext.getFailureTreeProvider();
+        if (failureTreeProvider) {
+            failureTreeProvider.updateFailures(testName, callStack);
+            // Set context to show tree view
+            vscode.commands.executeCommand('setContext', 'robotframework:hasFailures', true);
+        }
     }
 
     async runTest(
@@ -167,12 +179,24 @@ export class TestExecutor {
             fs.mkdirSync(outputDir, { recursive: true });
         }
 
+        // Get the listener path from extension resources
+        const extensionPath = path.dirname(path.dirname(__dirname));
+        const listenerPath = path.join(extensionPath, 'resources', 'test_listener.py');
+        const listenerOutputPath = path.join(outputDir, 'listener_output.json');
+
         // Debug mode arguments - show all keyword executions and details
         const debugArgs = debugMode ? [
             '--loglevel', 'DEBUG:INFO',           // Show DEBUG level in log, INFO in console
             '--console', 'verbose',                // Verbose console output
             '--timestampoutputs',                  // Add timestamps to output files
             '--debugfile', path.join(outputDir, 'debug.log'),  // Create detailed debug file
+        ] : [];
+
+        // Add listener if available
+        // Note: On Windows, use ';' as separator for listener arguments (not ':' which conflicts with drive letters)
+        const listenerSeparator = process.platform === 'win32' ? ';' : ':';
+        const listenerArgs = fs.existsSync(listenerPath) ? [
+            '--listener', `${listenerPath}${listenerSeparator}${listenerOutputPath}`
         ] : [];
 
         // Build robot command
@@ -188,6 +212,7 @@ export class TestExecutor {
             'log.html',
             '--report',
             'report.html',
+            ...listenerArgs,
             ...debugArgs,
             ...additionalArgs,
             // Only add --test filter if running an individual test
@@ -260,30 +285,43 @@ export class TestExecutor {
                             output: output
                         };
                     } else {
-                        // Try to parse text output first (more reliable for failure detection)
-                        const textResult = this.parseTextOutput(output, testName);
+                        // Try listener output first - it has the most accurate line numbers
+                        this.outputChannel.appendLine(`[DEBUG] Attempting to parse listener output: ${listenerOutputPath}`);
+                        const listenerResult = this.parseListenerOutput(listenerOutputPath, testName);
 
-                        if (textResult) {
-                            // Text output found a clear result
+                        if (listenerResult) {
+                            this.outputChannel.appendLine(`[DEBUG] Listener result found: line=${listenerResult.line}, passed=${listenerResult.passed}`);
+                            // Listener output has accurate line info
                             testResult = {
-                                ...textResult,
+                                ...listenerResult,
                                 duration: duration,
                                 output: output
                             };
                         } else {
+                            this.outputChannel.appendLine(`[DEBUG] Listener result not found, falling back to XML parsing`);
                             // Fallback to XML parsing
                             testResult = this.parseOutputXml(outputXmlPath, testName);
                             testResult.duration = duration;
                             testResult.output = output;
 
-                            // If XML also didn't find result, use exit code
+                            // If XML parsing failed, try text output as fallback
                             if (testResult.message === 'Test result not found in output' || testResult.message === 'Output XML not found') {
-                                testResult = {
-                                    passed: code === 0,
-                                    message: code === 0 ? 'Test passed' : `Test failed with exit code ${code}`,
-                                    duration: duration,
-                                    output: output
-                                };
+                                const textResult = this.parseTextOutput(output, testName);
+                                if (textResult) {
+                                    testResult = {
+                                        ...textResult,
+                                        duration: duration,
+                                        output: output
+                                    };
+                                } else {
+                                    // Ultimate fallback: use exit code
+                                    testResult = {
+                                        passed: code === 0,
+                                        message: code === 0 ? 'Test passed' : `Test failed with exit code ${code}`,
+                                        duration: duration,
+                                        output: output
+                                    };
+                                }
                             }
                         }
                     }
@@ -400,6 +438,118 @@ export class TestExecutor {
         }
     }
 
+    /**
+     * Parse the listener output JSON file for test results with accurate line numbers
+     */
+    private parseListenerOutput(listenerOutputPath: string, testName: string): TestResult | null {
+        try {
+            if (!fs.existsSync(listenerOutputPath)) {
+                this.outputChannel.appendLine(`[DEBUG] Listener output not found: ${listenerOutputPath}`);
+                return null;
+            }
+
+            const content = fs.readFileSync(listenerOutputPath, 'utf-8');
+            const data = JSON.parse(content);
+
+            if (!data.test_results || !data.test_results[testName]) {
+                this.outputChannel.appendLine(`[DEBUG] Test '${testName}' not found in listener output`);
+                return null;
+            }
+
+            const testResult = data.test_results[testName];
+            const passed = testResult.status === 'PASS';
+
+            let message = testResult.message || (passed ? 'Test passed' : 'Test failed');
+            let expected: string | undefined;
+            let actual: string | undefined;
+            let failureLine = testResult.lineno || 0;
+            let failedKeyword: string | undefined;
+
+            // NEW: Check for version 2 format with call stacks
+            if (!passed && data.version === 2 && testResult.stack_trace_key && data.call_stacks) {
+                const callStack: StackFrame[] = data.call_stacks[testResult.stack_trace_key];
+
+                if (callStack && callStack.length > 0) {
+                    this.outputChannel.appendLine(`[DEBUG] Using enhanced stack trace with ${callStack.length} frames`);
+
+                    // Get the actual failure point (deepest)
+                    const failurePoint = StackTraceFormatter.getFailurePoint(callStack);
+
+                    if (failurePoint) {
+                        failureLine = failurePoint.lineno;
+                        failedKeyword = failurePoint.kwname || failurePoint.name;
+                        const failureMessage = failurePoint.message || message;
+
+                        this.outputChannel.appendLine(`[DEBUG] Failure point: ${failedKeyword} at line ${failureLine}`);
+
+                        // Parse expected/actual from failure point
+                        const { expected: exp, actual: act } = this.parseExpectedActual(
+                            failureMessage,
+                            failurePoint.args || [],
+                            failedKeyword || ''
+                        );
+                        expected = exp;
+                        actual = act;
+
+                        // Format full stack trace
+                        const stackTrace = StackTraceFormatter.formatStackTrace(callStack);
+                        const compactTrace = StackTraceFormatter.formatCompactStackTrace(callStack);
+
+                        // Build detailed message with stack trace
+                        message = `${stackTrace}\n\nCall path: ${compactTrace}`;
+
+                        this.outputChannel.appendLine(`[DEBUG] Stack trace:\n${stackTrace}`);
+                        this.outputChannel.appendLine(`[DEBUG] Expected: ${expected}, Actual: ${actual}`);
+
+                        // Update tree view with call stack
+                        this.updateFailureTreeView(testName, callStack);
+                    }
+                }
+            }
+            // FALLBACK: Use old format with failed_keywords array
+            else if (!passed && testResult.failed_keywords && testResult.failed_keywords.length > 0) {
+                // Use LAST failed keyword (deepest) instead of first
+                const deepestFailedKw = testResult.failed_keywords[testResult.failed_keywords.length - 1];
+                failedKeyword = deepestFailedKw.kwname || deepestFailedKw.name;
+                // IMPORTANT: Use the failed keyword's line number, not the test's line number
+                failureLine = deepestFailedKw.lineno || testResult.lineno || 0;
+                const failureMessage = deepestFailedKw.message || message;
+
+                this.outputChannel.appendLine(`[DEBUG] Failed keyword (legacy): ${failedKeyword} at line ${failureLine}`);
+                this.outputChannel.appendLine(`[DEBUG] Message: ${failureMessage}`);
+                this.outputChannel.appendLine(`[DEBUG] Args: ${JSON.stringify(deepestFailedKw.args)}`);
+
+                // Try to parse expected/actual from the message
+                const { expected: exp, actual: act } = this.parseExpectedActual(
+                    failureMessage,
+                    deepestFailedKw.args || [],
+                    failedKeyword || ''
+                );
+                expected = exp;
+                actual = act;
+
+                this.outputChannel.appendLine(`[DEBUG] Parsed - Expected: ${expected}, Actual: ${actual}`);
+
+                // Build detailed message with line info
+                if (failureLine > 0) {
+                    message = `[Line ${failureLine}] ${failedKeyword ? `${failedKeyword}: ` : ''}${failureMessage}`;
+                }
+            }
+
+            return {
+                passed: passed,
+                message: message,
+                expected: expected,
+                actual: actual,
+                output: '',
+                line: failureLine
+            };
+        } catch (error) {
+            this.outputChannel.appendLine(`[DEBUG] Error parsing listener output: ${error}`);
+            return null;
+        }
+    }
+
     private parseOutputXml(xmlPath: string, testName: string): TestResult {
         try {
             if (!fs.existsSync(xmlPath)) {
@@ -412,88 +562,76 @@ export class TestExecutor {
 
             const xmlContent = fs.readFileSync(xmlPath, 'utf-8');
 
-            // Match test element with name and line attributes
+            // Match test element - attributes can be in any order
             const escapedTestName = testName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            
+            // First, find the test element with the name
             const testRegex = new RegExp(
-                `<test[^>]*name="${escapedTestName}"[^>]*line="(\\d+)"[^>]*>([\\s\\S]*?)</test>`,
+                `<test[^>]*name="${escapedTestName}"[^>]*>([\\s\\S]*?)</test>`,
                 'i'
             );
             
-            // Try alternative format where line comes before name
-            const testRegexAlt = new RegExp(
-                `<test[^>]*line="(\\d+)"[^>]*name="${escapedTestName}"[^>]*>([\\s\\S]*?)</test>`,
-                'i'
-            );
-
-            let match = xmlContent.match(testRegex) || xmlContent.match(testRegexAlt);
+            const testMatch = xmlContent.match(testRegex);
             
-            // Fallback: match without line number
-            if (!match) {
-                const testRegexNoLine = new RegExp(
-                    `<test[^>]*name="${escapedTestName}"[^>]*>([\\s\\S]*?)</test>`,
-                    'i'
-                );
-                const noLineMatch = xmlContent.match(testRegexNoLine);
-                if (noLineMatch) {
-                    match = [noLineMatch[0], '0', noLineMatch[1]];
-                }
-            }
-
-            if (match) {
-                const testLine = parseInt(match[1]) || 0;
-                const testContent = match[2] || match[0];
-                
-                // Check test status
-                const statusMatch = testContent.match(/<status[^>]*status="(PASS|FAIL)"[^>]*>/);
-                const status = statusMatch ? statusMatch[1] : 'FAIL';
-                const passed = status === 'PASS';
-
-                let message = passed ? 'Test passed' : 'Test failed';
-                let expected: string | undefined;
-                let actual: string | undefined;
-                let failureLine = testLine;
-                let failedKeyword: string | undefined;
-
-                if (!passed) {
-                    // Find the failed keyword and extract details
-                    const failedKwResult = this.extractFailedKeywordInfo(testContent);
-                    
-                    if (failedKwResult) {
-                        message = failedKwResult.message;
-                        expected = failedKwResult.expected;
-                        actual = failedKwResult.actual;
-                        failedKeyword = failedKwResult.keywordName;
-                        
-                        // Try to find the exact line of the failed keyword in the source file
-                        const sourceFilePath = this.extractSourcePath(xmlContent);
-                        if (sourceFilePath && failedKeyword) {
-                            const keywordLine = this.findKeywordLineInFile(sourceFilePath, failedKeyword, testLine);
-                            if (keywordLine > 0) {
-                                failureLine = keywordLine;
-                            }
-                        }
-                        
-                        // Build a detailed message with line info
-                        if (failureLine > 0) {
-                            message = `[Line ${failureLine}] ${failedKeyword ? `${failedKeyword}: ` : ''}${failedKwResult.message}`;
-                        }
-                    }
-                }
-
+            if (!testMatch) {
                 return {
-                    passed: passed,
-                    message: message,
-                    expected: expected,
-                    actual: actual,
-                    output: '',
-                    line: failureLine
+                    passed: false,
+                    message: 'Test result not found in output',
+                    output: ''
                 };
             }
 
+            const fullTestElement = testMatch[0];
+            const testContent = testMatch[1];
+            
+            // Extract line number from the test element's opening tag
+            const lineMatch = fullTestElement.match(/<test[^>]*\sline="(\d+)"/i);
+            const testLine = lineMatch ? parseInt(lineMatch[1]) : 0;
+                
+            // Check test status
+            const statusMatch = testContent.match(/<status[^>]*status="(PASS|FAIL)"[^>]*>/);
+            const status = statusMatch ? statusMatch[1] : 'FAIL';
+            const passed = status === 'PASS';
+
+            let message = passed ? 'Test passed' : 'Test failed';
+            let expected: string | undefined;
+            let actual: string | undefined;
+            let failureLine = testLine;
+            let failedKeyword: string | undefined;
+
+            if (!passed) {
+                // Find the failed keyword and extract details
+                const failedKwResult = this.extractFailedKeywordInfo(testContent);
+                
+                if (failedKwResult) {
+                    message = failedKwResult.message;
+                    expected = failedKwResult.expected;
+                    actual = failedKwResult.actual;
+                    failedKeyword = failedKwResult.keywordName;
+                    
+                    // Try to find the exact line of the failed keyword in the source file
+                    const sourceFilePath = this.extractSourcePath(xmlContent);
+                    if (sourceFilePath && failedKeyword) {
+                        const keywordLine = this.findKeywordLineInFile(sourceFilePath, failedKeyword, testLine);
+                        if (keywordLine > 0) {
+                            failureLine = keywordLine;
+                        }
+                    }
+                    
+                    // Build a detailed message with line info
+                    if (failureLine > 0) {
+                        message = `[Line ${failureLine}] ${failedKeyword ? `${failedKeyword}: ` : ''}${failedKwResult.message}`;
+                    }
+                }
+            }
+
             return {
-                passed: false,
-                message: 'Test result not found in output',
-                output: ''
+                passed: passed,
+                message: message,
+                expected: expected,
+                actual: actual,
+                output: '',
+                line: failureLine
             };
         } catch (error) {
             return {
@@ -556,23 +694,45 @@ export class TestExecutor {
      * Parse Expected and Actual values from failure message and keyword arguments
      */
     private parseExpectedActual(
-        message: string, 
-        args: string[], 
+        message: string,
+        args: string[],
         keywordName: string
     ): { expected?: string; actual?: string } {
         let expected: string | undefined;
         let actual: string | undefined;
-        
+
+        // Clean message first - remove stacktraces and excessive whitespace
+        const cleanMessage = this._cleanMessage(message);
+
         // Common patterns in Robot Framework failure messages:
         // "45.0 != 42.0" - numeric comparison
         // "'actual' != 'expected'" - string comparison
         // "X should be Y" - various assertions
-        
-        // Pattern 1: "X != Y" format
-        const neqMatch = message.match(/^(.+?)\s*!=\s*(.+)$/);
+
+        // Selenium/WebDriver exceptions - extract main message only
+        if (cleanMessage.includes('Exception:') || cleanMessage.includes('Error:')) {
+            // Extract exception type and first meaningful message
+            const exceptionMatch = cleanMessage.match(/([\w]+Exception|[\w]+Error):\s*Message:\s*(.+?)(?:\(Session|Stacktrace|$)/s);
+            if (exceptionMatch) {
+                const exceptionType = exceptionMatch[1];
+                const exceptionMsg = exceptionMatch[2].trim().substring(0, 200);
+                actual = exceptionType;
+                expected = `No exception`;
+                // Add shortened message to actual
+                if (exceptionMsg) {
+                    actual = `${exceptionType}: ${exceptionMsg}`;
+                }
+                return { expected, actual };
+            }
+        }
+
+        // Pattern 1: "X != Y" format (most common for comparison failures)
+        // But avoid matching if it's part of a long error message with stacktrace
+        const neqMatch = cleanMessage.match(/^([^\n]+?)\s*!=\s*([^\n]+?)$/);
         if (neqMatch) {
             actual = neqMatch[1].trim();
             expected = neqMatch[2].trim();
+            this.outputChannel.appendLine(`[DEBUG] Pattern 1 matched: actual="${actual}", expected="${expected}"`);
             return { expected, actual };
         }
         
@@ -606,7 +766,7 @@ export class TestExecutor {
             expected = `Should contain: ${args[1]}`;
             return { expected, actual };
         }
-        
+
         // Pattern 6: "is not true" / "is not false" for Should Be True/False
         if (keywordName.toLowerCase().includes('should be true')) {
             actual = 'False';
@@ -617,7 +777,7 @@ export class TestExecutor {
             }
             return { expected, actual };
         }
-        
+
         if (keywordName.toLowerCase().includes('should be false')) {
             actual = 'True';
             expected = 'False';
@@ -636,6 +796,43 @@ export class TestExecutor {
         }
         
         return { expected, actual };
+    }
+
+    /**
+     * Clean message by removing Selenium/WebDriver stacktraces and excessive formatting
+     */
+    private _cleanMessage(message: string): string {
+        // Split into lines
+        const lines = message.split('\n');
+        const cleanLines: string[] = [];
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+
+            // Stop at stacktrace markers
+            if (trimmed.startsWith('Stacktrace:') ||
+                trimmed.startsWith('0x') ||
+                line.match(/^\s+0x[0-9a-fA-F]+/) ||
+                trimmed.startsWith('(Session info:') ||
+                trimmed.startsWith('Build info:')) {
+                break;
+            }
+
+            // Skip empty lines and excessive whitespace
+            if (trimmed && trimmed.length > 0) {
+                cleanLines.push(trimmed);
+            }
+        }
+
+        // Join with space and limit length
+        let cleaned = cleanLines.join(' ');
+
+        // Limit to reasonable length
+        if (cleaned.length > 500) {
+            cleaned = cleaned.substring(0, 497) + '...';
+        }
+
+        return cleaned;
     }
 
     /**

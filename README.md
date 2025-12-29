@@ -25,11 +25,50 @@
 
 ## ✨ Features
 
+### 🎯 NEW in v2.0: Advanced Stack Traces & Deep Debugging
+
+**Deep Stack Trace Analysis** - No more guessing where failures happen! When keywords call other keywords, see the complete call hierarchy down to the actual failure point.
+
+**Features:**
+- 📍 **Python-style tracebacks** showing the full keyword call path
+- 🌳 **Interactive Tree View** - Click any keyword in the stack to jump to its source
+- 🎯 **Root Cause Detection** - Instantly navigate to the exact line that failed
+- 🧹 **Clean error messages** - Selenium/WebDriver stacktraces filtered out
+- 📊 **Expected vs Actual** values clearly displayed
+
+**Example Stack Trace:**
+```
+→ Variable Operations (example.robot:31)
+  → Should Be Equal As Numbers (example.robot:39) [FAILED]
+    Error: 45.0 != 42.0
+    Expected: 42.0
+    Actual: 45.0
+```
+
 ### 🧪 Test Explorer & Results
 
 Run and debug your Robot Framework tests directly from VS Code's Test Explorer with colored results.
 
 ![Test Results](https://raw.githubusercontent.com/Skisperd/robotframework-pro-extension/main/docs/images/test-results.png)
+
+### 🐛 NEW in v2.0: Professional Debugger with Breakpoints
+
+**Real Debugging** - Set breakpoints, step through keywords, inspect variables in real-time!
+
+**Features:**
+- 🔴 **Breakpoints** - Set breakpoints directly in .robot files
+- ⏯️ **Step Over/Into/Out** - Navigate through keyword execution
+- 🔍 **Variable Inspection** - View all Robot Framework variables in real-time
+- ⏸️ **Pause on Breakpoint** - Execution pauses at breakpoints, inspect state
+- 📊 **Call Stack View** - See the complete execution hierarchy
+- 🎨 **Colored Debug Output** - Beautiful terminal output with ANSI colors
+
+**How it works:**
+1. Set breakpoints by clicking on line numbers in .robot files
+2. Press F5 or use Debug commands
+3. Execution pauses at breakpoints
+4. Inspect variables in the Variables pane
+5. Step through keywords one by one
 
 ### 🔍 Real-time Debug Output
 
@@ -69,6 +108,16 @@ At the end of each test run, see a complete summary with all results and pass/fa
 
 ## 📦 Features List
 
+### 🎯 NEW - Advanced Debugging & Stack Traces (v2.0)
+- ✅ **Deep Stack Traces** - Python-style tracebacks showing full keyword hierarchy
+- ✅ **Interactive Tree View** - Click to navigate through failure call stack
+- ✅ **Root Cause Detection** - Navigate directly to the exact failure line
+- ✅ **Real Breakpoints** - Set breakpoints in .robot files that actually work
+- ✅ **Step Over/Into/Out** - Step through keyword execution like a pro
+- ✅ **Live Variable Inspection** - View all RF variables during debugging
+- ✅ **Clean Error Messages** - Selenium/WebDriver stacktraces automatically filtered
+- ✅ **Expected vs Actual** - Clear display of assertion failures
+
 ### Test Explorer & Execution
 - ✅ Test Explorer with hierarchical test display
 - ✅ Run individual tests or entire files
@@ -76,6 +125,7 @@ At the end of each test run, see a complete summary with all results and pass/fa
 - ✅ Three run profiles: Run, Debug, Run Verbose
 - ✅ Real-time test status (passed/failed)
 - ✅ Test execution summary with failure details
+- ✅ Keyword Call Stack view for failed tests
 
 ### Language Features
 - ✅ **Go to Definition (F12)** - Navigate to keyword definitions
@@ -134,7 +184,45 @@ Includes beautiful Material themes:
 
 ## 📝 Release Notes
 
-### 1.1.2 (Latest)
+### 2.0.0 (Latest) - Major Update! 🎉
+
+**Revolutionary Debugging & Stack Trace Features**
+
+This is the biggest update yet! We've completely reimagined how you debug Robot Framework tests.
+
+**🎯 Deep Stack Trace Analysis**
+- ✨ **Python-style tracebacks** - See complete keyword call hierarchy from test to failure point
+- ✨ **Interactive Tree View** - "Keyword Call Stack" panel in Test Explorer
+- ✨ **Root cause detection** - Click any keyword in the stack to jump to exact source line
+- ✨ **Clean error messages** - Selenium/WebDriver hex stacktraces automatically filtered
+- ✨ **Smart Expected/Actual parsing** - See what was expected vs what happened
+
+**🐛 Professional Debugger**
+- ✨ **Real breakpoints** - Set breakpoints in .robot files that actually pause execution
+- ✨ **Step Over/Into/Out** - Navigate through keyword execution step-by-step
+- ✨ **Live variable inspection** - View all Robot Framework variables in real-time
+- ✨ **File-based communication** - Innovative pause mechanism using file watchers
+- ✨ **Colored debug output** - Beautiful ANSI-colored terminal output
+
+**🔧 Technical Improvements**
+- ✨ Enhanced test listener with manual call stack tracking
+- ✨ Listener v2 API compatibility (RF 6.x+)
+- ✨ Stack trace formatter with compact display
+- ✨ Debug adapter with DAP protocol implementation
+- ✨ Backward compatible JSON format (supports old format)
+
+**📊 Enhanced Test Results**
+- ✨ Failure messages show full call path
+- ✨ Line numbers point to actual failure, not parent keyword
+- ✨ Clean, readable error messages
+- ✨ Expected vs Actual values clearly displayed
+
+**Bug Fixes**
+- 🐛 Fixed nested keyword failures showing wrong line numbers
+- 🐛 Fixed verbose Selenium stacktraces in output
+- 🐛 Fixed Expected/Actual parsing for complex assertions
+
+### 1.1.2
 - 🎨 New extension icon
 - 🐛 Fixed extension activation issues
 

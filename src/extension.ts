@@ -15,6 +15,7 @@ import { RobocopIntegration } from './languageServer/robocopIntegration';
 import { ReportViewerProvider } from './reportViewer/reportViewer';
 import { ImportCodeActionProvider, RemoveUnusedImportsCodeAction } from './languageServer/importManager';
 import { MultiRootWorkspaceManager } from './workspace/workspaceManager';
+import { FailureTreeProvider } from './testExplorer/failureTreeView';
 
 let client: LanguageClient;
 let testRunner: TestRunner;
@@ -27,6 +28,7 @@ let robocopIntegration: RobocopIntegration;
 // @ts-ignore - reportViewer is used for report viewing commands
 let reportViewer: ReportViewerProvider;
 let workspaceManager: MultiRootWorkspaceManager;
+let failureTreeProvider: FailureTreeProvider;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('Robot Framework Pro extension is now active!');
@@ -63,6 +65,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         // Initialize test controller (Test Explorer)
         testController = new RobotFrameworkTestController(context);
         outputChannel.appendLine('Test controller initialized - Test Explorer should now be visible');
+
+        // Initialize Failure Tree View for keyword call stacks
+        failureTreeProvider = new FailureTreeProvider();
+        const failureTreeView = vscode.window.createTreeView('robotFrameworkFailures', {
+            treeDataProvider: failureTreeProvider,
+            showCollapseAll: true
+        });
+        context.subscriptions.push(failureTreeView);
+
+        // Set context for view visibility
+        vscode.commands.executeCommand('setContext', 'robotframework:hasFailures', false);
+        outputChannel.appendLine('Failure tree view registered');
 
         // Start language server
         await startLanguageServer(context);
@@ -103,6 +117,14 @@ export function deactivate(): Thenable<void> | undefined {
         return undefined;
     }
     return client.stop();
+}
+
+/**
+ * Get the failure tree provider instance
+ * Used by testExecutor to update tree view with failures
+ */
+export function getFailureTreeProvider(): FailureTreeProvider | undefined {
+    return failureTreeProvider;
 }
 
 async function startLanguageServer(context: vscode.ExtensionContext): Promise<void> {

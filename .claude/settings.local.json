@@ -17,7 +17,9 @@
       "Bash(del test-detection.js)",
       "Bash(if exist test-detection.js del test-detection.js)",
       "Bash(npm run package:*)",
-      "Bash(npx vsce:*)"
+      "Bash(npx vsce:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

@@ -1,0 +1,175 @@
+{
+  "version": 2,
+  "test_results": {
+    "Basic Test Example": {
+      "name": "Basic Test Example",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.Basic Test Example",
+      "starttime": "20251229 15:10:34.413",
+      "endtime": "20251229 15:10:34.414",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 24,
+      "failed_keywords": []
+    },
+    "Variable Operations": {
+      "name": "Variable Operations",
+      "status": "FAIL",
+      "message": "45.0 != 42.0",
+      "longname": "Example.Variable Operations",
+      "starttime": "20251229 15:10:34.415",
+      "endtime": "20251229 15:10:34.417",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 31,
+      "failed_keywords": [
+        {
+          "name": "BuiltIn.Should Be Equal As Numbers",
+          "kwname": "Should Be Equal As Numbers",
+          "libname": "BuiltIn",
+          "source": "D:\\development\\extensao\\examples\\example.robot",
+          "lineno": 39,
+          "status": "FAIL",
+          "message": "45.0 != 42.0",
+          "args": [
+            "${result}",
+            "42"
+          ],
+          "type": "KEYWORD"
+        }
+      ],
+      "stack_trace_key": "Variable Operations_0"
+    },
+    "String Operations": {
+      "name": "String Operations",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.String Operations",
+      "starttime": "20251229 15:10:34.417",
+      "endtime": "20251229 15:10:34.419",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 41,
+      "failed_keywords": []
+    },
+    "List Operations": {
+      "name": "List Operations",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.List Operations",
+      "starttime": "20251229 15:10:34.419",
+      "endtime": "20251229 15:10:34.420",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 52,
+      "failed_keywords": []
+    },
+    "FOR Loop Example": {
+      "name": "FOR Loop Example",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.FOR Loop Example",
+      "starttime": "20251229 15:10:34.420",
+      "endtime": "20251229 15:10:34.422",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 61,
+      "failed_keywords": []
+    },
+    "FOR Loop With Range": {
+      "name": "FOR Loop With Range",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.FOR Loop With Range",
+      "starttime": "20251229 15:10:34.422",
+      "endtime": "20251229 15:10:34.425",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 69,
+      "failed_keywords": []
+    },
+    "IF Statement Example": {
+      "name": "IF Statement Example",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.IF Statement Example",
+      "starttime": "20251229 15:10:34.425",
+      "endtime": "20251229 15:10:34.426",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 77,
+      "failed_keywords": []
+    },
+    "IF-ELSE IF-ELSE Example": {
+      "name": "IF-ELSE IF-ELSE Example",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.IF-ELSE IF-ELSE Example",
+      "starttime": "20251229 15:10:34.426",
+      "endtime": "20251229 15:10:34.427",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 86,
+      "failed_keywords": []
+    },
+    "TRY-EXCEPT Example": {
+      "name": "TRY-EXCEPT Example",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.TRY-EXCEPT Example",
+      "starttime": "20251229 15:10:34.427",
+      "endtime": "20251229 15:10:34.428",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 98,
+      "failed_keywords": []
+    },
+    "Custom Keyword Usage": {
+      "name": "Custom Keyword Usage",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.Custom Keyword Usage",
+      "starttime": "20251229 15:10:34.428",
+      "endtime": "20251229 15:10:34.431",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 110,
+      "failed_keywords": []
+    },
+    "Assertion Examples": {
+      "name": "Assertion Examples",
+      "status": "PASS",
+      "message": "",
+      "longname": "Example.Assertion Examples",
+      "starttime": "20251229 15:10:34.431",
+      "endtime": "20251229 15:10:34.432",
+      "source": "D:\\development\\extensao\\examples\\example.robot",
+      "lineno": 117,
+      "failed_keywords": []
+    }
+  },
+  "call_stacks": {
+    "Variable Operations_0": [
+      {
+        "name": "BuiltIn.Should Be Equal As Numbers",
+        "kwname": "Should Be Equal As Numbers",
+        "libname": "BuiltIn",
+        "source": "D:\\development\\extensao\\examples\\example.robot",
+        "lineno": 39,
+        "args": [
+          "${result}",
+          "42"
+        ],
+        "depth": 1,
+        "type": "KEYWORD"
+      },
+      {
+        "name": "BuiltIn.Should Be Equal As Numbers",
+        "kwname": "Should Be Equal As Numbers",
+        "libname": "BuiltIn",
+        "source": "D:\\development\\extensao\\examples\\example.robot",
+        "lineno": 39,
+        "args": [
+          "${result}",
+          "42"
+        ],
+        "depth": 1,
+        "type": "KEYWORD",
+        "is_failure_point": true,
+        "message": "45.0 != 42.0",
+        "status": "FAIL"
+      }
+    ]
+  }
+}

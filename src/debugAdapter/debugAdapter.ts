@@ -28,14 +28,20 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
 
     private _robotProcess: ChildProcess | undefined;
     private _currentLine = 0;
-    private _breakpoints = new Map<string, DebugProtocol.Breakpoint[]>();
-    
+    private _breakpoints = new Map<string, number[]>();
+
     // Runtime state for variable display
     private _currentTestName: string = '';
     private _currentSuiteName: string = '';
-    private _currentSourceFile: string = '';
-    private _outputDir: string = '';
     private _cwd: string = '';
+
+    // Debug communication files
+    private _pauseFile: string = '';
+    private _breakpointFile: string = '';
+    private _variableFile: string = '';
+    private _stepFile: string = '';
+    private _pauseWatcher: fs.FSWatcher | undefined;
+    private _currentVariables: any = {};
 
     public constructor() {
         super();
@@ -82,26 +88,37 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
 
         // Store state for variable display
         this._cwd = cwd;
-        this._currentSourceFile = target;
         this._currentSuiteName = path.basename(target, path.extname(target));
-        this._outputDir = cwd;
 
-        // Get the path to the debug listener
-        // The listener is bundled with the extension
+        // Setup debug communication files
+        this._pauseFile = path.join(cwd, '.rf_debug_pause');
+        this._breakpointFile = path.join(cwd, '.rf_debug_breakpoints.json');
+        this._variableFile = path.join(cwd, '.rf_debug_variables.json');
+        this._stepFile = path.join(cwd, '.rf_debug_step');
+
+        // Clean up old debug files
+        this._cleanupDebugFiles();
+
+        // Write breakpoints to file for listener
+        this._writeBreakpointsFile();
+
+        // Setup file watcher for pause events
+        this._setupPauseWatcher();
+
+        // Get the path to the enhanced debug listener v2
         const listenerDir = path.join(__dirname, '..', '..', 'resources');
-        const listenerPath = path.join(listenerDir, 'debug_listener.py');
+        const listenerPath = path.join(listenerDir, 'debug_listener_v2.py');
         const listenerExists = fs.existsSync(listenerPath);
 
-        // Build robot command arguments with verbose output for debugging
+        // Build robot command arguments with debug listener v2
         const robotArgs = ['-m', 'robot'];
-        
-        // Add the debug listener for real-time keyword execution display
-        // The listener needs to be specified as module.ClassName format
+
+        // Add the enhanced debug listener with file-based communication
         if (listenerExists) {
             robotArgs.push('--pythonpath', listenerDir);
-            robotArgs.push('--listener', 'debug_listener.DebugListener');
+            robotArgs.push('--listener', 'debug_listener_v2.DebugListener');
         }
-        robotArgs.push('--loglevel', 'DEBUG:INFO'); // DEBUG level in log, INFO in console
+        robotArgs.push('--loglevel', 'DEBUG:INFO');
 
         if (args.arguments) {
             robotArgs.push(...args.arguments);
@@ -109,23 +126,34 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
 
         robotArgs.push(target);
 
-        // Send initial header to Debug Console (use stdout for color support)
+        // Send initial header to Debug Console
         this.sendEvent(new OutputEvent(`\n${'='.repeat(80)}\n`, 'stdout'));
-        this.sendEvent(new OutputEvent(`Robot Framework Debug Session\n`, 'stdout'));
+        this.sendEvent(new OutputEvent(`Robot Framework Enhanced Debug Session\n`, 'stdout'));
         this.sendEvent(new OutputEvent(`${'='.repeat(80)}\n`, 'stdout'));
         this.sendEvent(new OutputEvent(`Python: ${python}\n`, 'stdout'));
         this.sendEvent(new OutputEvent(`Target: ${target}\n`, 'stdout'));
         this.sendEvent(new OutputEvent(`Working Directory: ${cwd}\n`, 'stdout'));
         if (listenerExists) {
-            this.sendEvent(new OutputEvent(`Listener: debug_listener.DebugListener\n`, 'stdout'));
+            this.sendEvent(new OutputEvent(`Listener: debug_listener_v2.DebugListener (Enhanced)\n`, 'stdout'));
+            this.sendEvent(new OutputEvent(`Breakpoints: ${this._getTotalBreakpointsCount()} active\n`, 'stdout'));
         }
         this.sendEvent(new OutputEvent(`Command: ${python} ${robotArgs.join(' ')}\n`, 'stdout'));
         this.sendEvent(new OutputEvent(`${'='.repeat(80)}\n\n`, 'stdout'));
 
-        // Spawn robot process
+        // Spawn robot process with debug communication environment variables
+        const debugEnv = {
+            ...process.env,
+            ...args.env,
+            PYTHONIOENCODING: 'utf-8',
+            FORCE_COLOR: '1',
+            RF_DEBUG_PAUSE_FILE: this._pauseFile,
+            RF_DEBUG_BP_FILE: this._breakpointFile,
+            RF_DEBUG_VAR_FILE: this._variableFile
+        };
+
         this._robotProcess = spawn(python, robotArgs, {
             cwd: cwd,
-            env: { ...process.env, ...args.env, PYTHONIOENCODING: 'utf-8', FORCE_COLOR: '1' },
+            env: debugEnv,
             shell: false
         });
 
@@ -170,21 +198,29 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
     }
 
     protected setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): void {
-        const path = args.source.path as string;
+        const sourcePath = args.source.path as string;
         const clientLines = args.lines || [];
 
+        // Store breakpoint line numbers
+        this._breakpoints.set(sourcePath, clientLines);
+
+        // Write breakpoints to file for listener to read
+        this._writeBreakpointsFile();
+
+        // Return verified breakpoints to VS Code
         const breakpoints = clientLines.map(line => {
             const bp = <DebugProtocol.Breakpoint>new Breakpoint(true, line);
-            bp.id = this._variableHandles.create(path);
+            bp.id = this._variableHandles.create(`${sourcePath}:${line}`);
+            bp.verified = true;
             return bp;
         });
-
-        this._breakpoints.set(path, breakpoints);
 
         response.body = {
             breakpoints: breakpoints
         };
         this.sendResponse(response);
+
+        this.sendEvent(new OutputEvent(`Breakpoints updated: ${clientLines.length} in ${path.basename(sourcePath)}\n`, 'console'));
     }
 
     protected threadsRequest(response: DebugProtocol.ThreadsResponse): void {
@@ -224,46 +260,42 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
         const variables: DebugProtocol.Variable[] = [];
         const scopeRef = this._variableHandles.get(args.variablesReference);
 
-        if (scopeRef === 'test') {
-            // Test-level variables
-            variables.push(
-                { name: '${TEST NAME}', value: this._currentTestName || 'Unknown', variablesReference: 0 },
-                { name: '${TEST DOCUMENTATION}', value: '', variablesReference: 0 },
-                { name: '${TEST TAGS}', value: '[]', variablesReference: 0 },
-                { name: '${TEST STATUS}', value: 'RUNNING', variablesReference: 0 }
-            );
-        } else if (scopeRef === 'suite') {
-            // Suite-level variables
-            variables.push(
-                { name: '${SUITE NAME}', value: this._currentSuiteName || 'Unknown', variablesReference: 0 },
-                { name: '${SUITE SOURCE}', value: this._currentSourceFile || '', variablesReference: 0 },
-                { name: '${SUITE DOCUMENTATION}', value: '', variablesReference: 0 },
-                { name: '${SUITE STATUS}', value: 'RUNNING', variablesReference: 0 }
-            );
-        } else if (scopeRef === 'global') {
-            // Global variables  
-            variables.push(
-                { name: '${OUTPUT DIR}', value: this._outputDir || '', variablesReference: 0 },
-                { name: '${OUTPUT FILE}', value: 'output.xml', variablesReference: 0 },
-                { name: '${LOG FILE}', value: 'log.html', variablesReference: 0 },
-                { name: '${REPORT FILE}', value: 'report.html', variablesReference: 0 },
-                { name: '${LOG LEVEL}', value: 'INFO', variablesReference: 0 }
-            );
+        // Load live variables from JSON file exported by listener
+        const liveVars = this._loadVariablesFromFile();
+
+        if (scopeRef === 'test' && liveVars && liveVars.test) {
+            // Test-level variables from listener
+            for (const [name, value] of Object.entries(liveVars.test)) {
+                variables.push({ name, value: String(value), variablesReference: 0 });
+            }
+        } else if (scopeRef === 'suite' && liveVars && liveVars.suite) {
+            // Suite-level variables from listener
+            for (const [name, value] of Object.entries(liveVars.suite)) {
+                variables.push({ name, value: String(value), variablesReference: 0 });
+            }
+        } else if (scopeRef === 'local' && liveVars && liveVars.local) {
+            // Local variables (user-defined) from listener
+            for (const [name, value] of Object.entries(liveVars.local)) {
+                variables.push({ name, value: String(value), variablesReference: 0 });
+            }
+        } else if (scopeRef === 'global' && liveVars && liveVars.global) {
+            // Global variables from listener
+            for (const [name, value] of Object.entries(liveVars.global)) {
+                variables.push({ name, value: String(value), variablesReference: 0 });
+            }
         } else if (scopeRef === 'builtin') {
-            // Built-in variables
+            // Built-in variables (hardcoded fallback)
             variables.push(
                 { name: '${CURDIR}', value: this._cwd || '', variablesReference: 0 },
                 { name: '${TEMPDIR}', value: process.env.TEMP || '/tmp', variablesReference: 0 },
                 { name: '${EXECDIR}', value: this._cwd || '', variablesReference: 0 },
                 { name: '${/}', value: require('path').sep, variablesReference: 0 },
                 { name: '${:}', value: require('path').delimiter, variablesReference: 0 },
-                { name: '${\\n}', value: '\\n', variablesReference: 0 },
                 { name: '${SPACE}', value: ' ', variablesReference: 0 },
                 { name: '${EMPTY}', value: '', variablesReference: 0 },
                 { name: '${True}', value: 'True', variablesReference: 0 },
                 { name: '${False}', value: 'False', variablesReference: 0 },
-                { name: '${None}', value: 'None', variablesReference: 0 },
-                { name: '${null}', value: 'None', variablesReference: 0 }
+                { name: '${None}', value: 'None', variablesReference: 0 }
             );
         }
 
@@ -274,18 +306,57 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
     }
 
     protected continueRequest(response: DebugProtocol.ContinueResponse, _args: DebugProtocol.ContinueArguments): void {
+        // Resume execution by deleting pause file
+        if (fs.existsSync(this._pauseFile)) {
+            try {
+                fs.unlinkSync(this._pauseFile);
+                this.sendEvent(new OutputEvent(`▶  Continue\n`, 'console'));
+            } catch (error) {
+                this.sendEvent(new OutputEvent(`ERROR: Failed to resume execution: ${error}\n`, 'stderr'));
+            }
+        }
         this.sendResponse(response);
     }
 
     protected nextRequest(response: DebugProtocol.NextResponse, _args: DebugProtocol.NextArguments): void {
+        // Step Over - write 'over' to step file
+        try {
+            fs.writeFileSync(this._stepFile, 'over', { encoding: 'utf-8' });
+            if (fs.existsSync(this._pauseFile)) {
+                fs.unlinkSync(this._pauseFile);
+            }
+            this.sendEvent(new OutputEvent(`▶  Step Over\n`, 'console'));
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`ERROR: Failed to step over: ${error}\n`, 'stderr'));
+        }
         this.sendResponse(response);
     }
 
     protected stepInRequest(response: DebugProtocol.StepInResponse, _args: DebugProtocol.StepInArguments): void {
+        // Step Into - write 'into' to step file
+        try {
+            fs.writeFileSync(this._stepFile, 'into', { encoding: 'utf-8' });
+            if (fs.existsSync(this._pauseFile)) {
+                fs.unlinkSync(this._pauseFile);
+            }
+            this.sendEvent(new OutputEvent(`▶  Step Into\n`, 'console'));
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`ERROR: Failed to step into: ${error}\n`, 'stderr'));
+        }
         this.sendResponse(response);
     }
 
     protected stepOutRequest(response: DebugProtocol.StepOutResponse, _args: DebugProtocol.StepOutArguments): void {
+        // Step Out - write 'out' to step file
+        try {
+            fs.writeFileSync(this._stepFile, 'out', { encoding: 'utf-8' });
+            if (fs.existsSync(this._pauseFile)) {
+                fs.unlinkSync(this._pauseFile);
+            }
+            this.sendEvent(new OutputEvent(`▶  Step Out\n`, 'console'));
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`ERROR: Failed to step out: ${error}\n`, 'stderr'));
+        }
         this.sendResponse(response);
     }
 
@@ -332,7 +403,115 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
         if (this._robotProcess) {
             this._robotProcess.kill();
         }
+        // Cleanup debug files and watcher
+        this._cleanupDebugFiles();
+        if (this._pauseWatcher) {
+            this._pauseWatcher.close();
+        }
         this.sendResponse(response);
+    }
+
+    // Helper methods for file-based debug communication
+
+    private _cleanupDebugFiles(): void {
+        /**
+         * Clean up debug communication files
+         */
+        const files = [this._pauseFile, this._breakpointFile, this._variableFile, this._stepFile];
+        for (const file of files) {
+            if (file && fs.existsSync(file)) {
+                try {
+                    fs.unlinkSync(file);
+                } catch (error) {
+                    // Ignore cleanup errors
+                }
+            }
+        }
+    }
+
+    private _writeBreakpointsFile(): void {
+        /**
+         * Write breakpoints to JSON file for listener to read
+         */
+        if (!this._breakpointFile) return;
+
+        const data: Record<string, number[]> = {};
+        for (const [sourcePath, lines] of this._breakpoints) {
+            // Normalize path for cross-platform compatibility
+            const normalized = path.normalize(sourcePath);
+            data[normalized] = lines;
+        }
+
+        try {
+            fs.writeFileSync(this._breakpointFile, JSON.stringify(data, null, 2), { encoding: 'utf-8' });
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`ERROR: Failed to write breakpoints file: ${error}\n`, 'stderr'));
+        }
+    }
+
+    private _setupPauseWatcher(): void {
+        /**
+         * Setup file watcher to detect when listener pauses execution
+         */
+        if (!this._pauseFile) return;
+
+        const watchDir = path.dirname(this._pauseFile);
+
+        try {
+            this._pauseWatcher = fs.watch(watchDir, (_eventType, filename) => {
+                if (!filename || filename !== path.basename(this._pauseFile)) {
+                    return;
+                }
+
+                // Check if pause file was created (execution paused)
+                if (fs.existsSync(this._pauseFile)) {
+                    // Read pause reason
+                    try {
+                        const reason = fs.readFileSync(this._pauseFile, { encoding: 'utf-8' });
+                        this.sendEvent(new OutputEvent(`\n⏸  Paused: ${reason}\n`, 'console'));
+                    } catch (error) {
+                        this.sendEvent(new OutputEvent(`\n⏸  Paused\n`, 'console'));
+                    }
+
+                    // Load current variables
+                    this._loadVariablesFromFile();
+
+                    // Notify VS Code that execution stopped
+                    this.sendEvent(new StoppedEvent('breakpoint', RobotFrameworkDebugSession.THREAD_ID));
+                }
+            });
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`WARNING: Failed to setup pause watcher: ${error}\n`, 'console'));
+        }
+    }
+
+    private _loadVariablesFromFile(): any {
+        /**
+         * Load current variables from JSON file exported by listener
+         */
+        if (!this._variableFile || !fs.existsSync(this._variableFile)) {
+            return null;
+        }
+
+        try {
+            const content = fs.readFileSync(this._variableFile, { encoding: 'utf-8' });
+            this._currentVariables = JSON.parse(content);
+            return this._currentVariables;
+        } catch (error) {
+            this.sendEvent(new OutputEvent(`WARNING: Failed to load variables: ${error}\n`, 'console'));
+            return null;
+        }
+    }
+
+    private _getTotalBreakpointsCount(): number {
+        /**
+         * Get total number of breakpoints across all files
+         */
+        let total = 0;
+        for (const lines of this._breakpoints.values()) {
+            total += lines.length;
+        }
+        return total;
     }
 }
 
