@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import { spawn } from 'child_process';
 
 export interface RobocopIssue {
@@ -16,6 +19,7 @@ export class RobocopIntegration implements vscode.Disposable {
     private diagnosticCollection: vscode.DiagnosticCollection;
     private fileWatcher: vscode.FileSystemWatcher | undefined;
     private lintDebounceTimers: Map<string, NodeJS.Timeout> = new Map();
+    private formatOnSaveDisposable: vscode.Disposable | undefined;
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('Robocop');
@@ -44,7 +48,7 @@ export class RobocopIntegration implements vscode.Disposable {
 
         // Set up file watcher for auto-linting
         this.fileWatcher = vscode.workspace.createFileSystemWatcher('**/*.{robot,resource}');
-        
+
         this.fileWatcher.onDidChange(uri => this.debouncedLint(uri));
         this.fileWatcher.onDidCreate(uri => this.debouncedLint(uri));
 
@@ -67,7 +71,48 @@ export class RobocopIntegration implements vscode.Disposable {
             this.diagnosticCollection.delete(doc.uri);
         });
 
+        // Set up format-on-save if enabled
+        this.setupFormatOnSave();
+
+        // Listen for configuration changes
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('robotframework.formatting.formatOnSave')) {
+                this.setupFormatOnSave();
+            }
+        });
+
         this.outputChannel.appendLine('Robocop integration initialized');
+    }
+
+    /**
+     * Set up or tear down format-on-save based on configuration
+     */
+    private setupFormatOnSave(): void {
+        const config = vscode.workspace.getConfiguration('robotframework');
+        const formatOnSave = config.get<boolean>('formatting.formatOnSave', false);
+        const robotidyEnabled = config.get<boolean>('robotidy.enabled', true);
+
+        // Dispose existing listener if any
+        if (this.formatOnSaveDisposable) {
+            this.formatOnSaveDisposable.dispose();
+            this.formatOnSaveDisposable = undefined;
+        }
+
+        if (formatOnSave && robotidyEnabled && this.isRobotidyAvailable) {
+            this.formatOnSaveDisposable = vscode.workspace.onWillSaveTextDocument(async (event) => {
+                if (event.document.languageId === 'robotframework') {
+                    const formattedContent = await this.formatFile(event.document.uri.fsPath);
+                    if (formattedContent !== null) {
+                        const fullRange = new vscode.Range(
+                            event.document.positionAt(0),
+                            event.document.positionAt(event.document.getText().length)
+                        );
+                        event.waitUntil(Promise.resolve([vscode.TextEdit.replace(fullRange, formattedContent)]));
+                    }
+                }
+            });
+            this.outputChannel.appendLine('Format-on-save enabled with robotidy');
+        }
     }
 
     /**
@@ -222,13 +267,26 @@ export class RobocopIntegration implements vscode.Disposable {
         try {
             const config = vscode.workspace.getConfiguration('robotframework');
             const pythonPath = config.get<string>('python.executable', 'python');
+            const excludeRules = config.get<string[]>('robocop.exclude', []);
+            const includeRules = config.get<string[]>('robocop.include', []);
 
-            // Run robocop with JSON output
+            // Run robocop with custom format
             const args = [
                 '-m', 'robocop',
-                '--format', '{source}:{line}:{col}:{severity}:{rule_id}:{desc}',
-                filePath
+                '--format', '{source}:{line}:{col}:{severity}:{rule_id}:{desc}'
             ];
+
+            // Add exclude rules
+            for (const rule of excludeRules) {
+                args.push('--exclude', rule);
+            }
+
+            // Add include rules (if specified, only these rules run)
+            for (const rule of includeRules) {
+                args.push('--include', rule);
+            }
+
+            args.push(filePath);
 
             const result = await this.executeCommand(pythonPath, args);
             return this.parseRobocopOutput(result.stdout);
@@ -278,37 +336,83 @@ export class RobocopIntegration implements vscode.Disposable {
     }
 
     async formatFile(filePath: string): Promise<string | null> {
-        const available = await this.checkRobocopAvailability();
+        const available = await this.checkRobotidyAvailability();
         if (!available) {
+            this.outputChannel.appendLine('robotidy not available. Install with: pip install robotframework-tidy');
             return null;
         }
 
         try {
             const config = vscode.workspace.getConfiguration('robotframework');
             const pythonPath = config.get<string>('python.executable', 'python');
+            const robotidyEnabled = config.get<boolean>('robotidy.enabled', true);
+            const lineLength = config.get<number>('robotidy.lineLength', 120);
 
-            // Try to use robotidy (Robocop's formatter)
+            if (!robotidyEnabled) {
+                return null;
+            }
+
+            // Create a temporary file to hold the content for formatting
+            const tempDir = os.tmpdir();
+            const tempFileName = `robotidy_${Date.now()}_${path.basename(filePath)}`;
+            const tempFilePath = path.join(tempDir, tempFileName);
+
+            // Copy the original file to temp location
+            const originalContent = fs.readFileSync(filePath, 'utf8');
+            fs.writeFileSync(tempFilePath, originalContent, 'utf8');
+
+            // Run robotidy on the temp file (it modifies in place)
             const args = [
                 '-m', 'robotidy',
-                '--check',
-                '--no-overwrite',
-                filePath
+                '--line-length', lineLength.toString(),
+                tempFilePath
             ];
 
             const result = await this.executeCommand(pythonPath, args);
 
-            // If robotidy is not available, return null
-            if (result.exitCode === 127 || result.stderr.includes('No module named')) {
-                this.outputChannel.appendLine('robotidy not available. Install with: pip install robotframework-tidy');
+            // Exit code 1 means file was changed, which is OK
+            // Exit code 0 means no changes needed
+            // Other exit codes indicate errors
+            if (result.exitCode !== 0 && result.exitCode !== 1) {
+                if (result.stderr.includes('No module named')) {
+                    this.outputChannel.appendLine('robotidy not available. Install with: pip install robotframework-tidy');
+                    this.isRobotidyAvailable = false;
+                } else {
+                    this.outputChannel.appendLine(`robotidy error: ${result.stderr}`);
+                }
+                // Clean up temp file
+                try { fs.unlinkSync(tempFilePath); } catch { /* ignore */ }
                 return null;
             }
 
-            // Return formatted content from stdout
-            return result.stdout;
+            // Read the formatted content from temp file
+            const formattedContent = fs.readFileSync(tempFilePath, 'utf8');
+
+            // Clean up temp file
+            try { fs.unlinkSync(tempFilePath); } catch { /* ignore */ }
+
+            return formattedContent;
         } catch (error) {
             this.outputChannel.appendLine(`Error formatting with robotidy: ${error}`);
             return null;
         }
+    }
+
+    /**
+     * Format a document using robotidy
+     */
+    async formatDocument(document: vscode.TextDocument): Promise<vscode.TextEdit[] | null> {
+        const formattedContent = await this.formatFile(document.uri.fsPath);
+        if (formattedContent === null) {
+            return null;
+        }
+
+        const fullRange = new vscode.Range(
+            document.positionAt(0),
+            document.positionAt(document.getText().length)
+        );
+
+        return [vscode.TextEdit.replace(fullRange, formattedContent)];
     }
 
     private executeCommand(command: string, args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -349,9 +453,26 @@ export class RobocopIntegration implements vscode.Disposable {
         if (this.fileWatcher) {
             this.fileWatcher.dispose();
         }
+        if (this.formatOnSaveDisposable) {
+            this.formatOnSaveDisposable.dispose();
+        }
         for (const timer of this.lintDebounceTimers.values()) {
             clearTimeout(timer);
         }
         this.lintDebounceTimers.clear();
+    }
+
+    /**
+     * Check if robotidy is available
+     */
+    isRobotidyEnabled(): boolean {
+        return this.isRobotidyAvailable === true;
+    }
+
+    /**
+     * Check if robocop is available
+     */
+    isRobocopEnabled(): boolean {
+        return this.isRobocopAvailable === true;
     }
 }

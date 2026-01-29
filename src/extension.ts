@@ -16,6 +16,8 @@ import { ReportViewerProvider } from './reportViewer/reportViewer';
 import { ImportCodeActionProvider, RemoveUnusedImportsCodeAction } from './languageServer/importManager';
 import { MultiRootWorkspaceManager } from './workspace/workspaceManager';
 import { FailureTreeProvider } from './testExplorer/failureTreeView';
+import { EnvironmentManager } from './utils/environmentManager';
+import { DependencyManager } from './utils/dependencyManager';
 
 let client: LanguageClient;
 let testRunner: TestRunner;
@@ -29,6 +31,8 @@ let robocopIntegration: RobocopIntegration;
 let reportViewer: ReportViewerProvider;
 let workspaceManager: MultiRootWorkspaceManager;
 let failureTreeProvider: FailureTreeProvider;
+let environmentManager: EnvironmentManager;
+let dependencyManager: DependencyManager;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     console.log('Robot Framework Pro extension is now active!');
@@ -101,9 +105,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         });
         context.subscriptions.push(robocopIntegration);
 
+        // Initialize Environment and Dependency managers
+        environmentManager = new EnvironmentManager();
+        dependencyManager = new DependencyManager();
+        context.subscriptions.push(environmentManager);
+        context.subscriptions.push(dependencyManager);
+        outputChannel.appendLine('Environment managers initialized');
+
+        // Register environment management commands
+        registerEnvironmentCommands(context);
+
+        // Validate environment on startup if enabled
+        const config = vscode.workspace.getConfiguration('robotframework');
+        if (config.get<boolean>('environment.validateOnStartup', true)) {
+            // Run non-blocking environment check
+            environmentManager.showStartupNotification().catch((error) => {
+                outputChannel.appendLine(`Environment validation failed: ${error}`);
+            });
+        }
+
         // Show welcome message on first install
         showWelcomeMessage(context);
-        
+
         outputChannel.appendLine('Extension fully activated!');
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -329,6 +352,29 @@ function registerCommands(context: vscode.ExtensionContext): void {
             vscode.window.showInformationMessage('Robot Framework workspace re-indexed');
         })
     );
+
+    // Format with Robotidy command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.formatWithRobotidy', async () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor || editor.document.languageId !== 'robotframework') {
+                vscode.window.showErrorMessage('No Robot Framework file is active');
+                return;
+            }
+
+            const edits = await robocopIntegration.formatDocument(editor.document);
+            if (edits && edits.length > 0) {
+                const edit = new vscode.WorkspaceEdit();
+                for (const textEdit of edits) {
+                    edit.replace(editor.document.uri, textEdit.range, textEdit.newText);
+                }
+                await vscode.workspace.applyEdit(edit);
+                vscode.window.showInformationMessage('File formatted with robotidy');
+            } else {
+                vscode.window.showWarningMessage('Could not format file. Is robotidy installed?');
+            }
+        })
+    );
 }
 
 function registerDebugger(context: vscode.ExtensionContext): void {
@@ -502,6 +548,43 @@ function watchFileChanges(context: vscode.ExtensionContext): void {
     });
 
     context.subscriptions.push(watcher);
+}
+
+function registerEnvironmentCommands(context: vscode.ExtensionContext): void {
+    // Check Environment command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.checkEnvironment', async () => {
+            const info = await environmentManager.checkEnvironment();
+            if (info.isValid) {
+                vscode.window.showInformationMessage(
+                    `Environment OK: ${info.pythonVersion}, ${info.robotFrameworkVersion}`
+                );
+            } else {
+                vscode.window.showWarningMessage(
+                    `Environment issues: ${info.errors.join(', ')}`,
+                    'Show Details'
+                ).then(action => {
+                    if (action === 'Show Details') {
+                        vscode.commands.executeCommand('robotframework.showEnvironmentInfo');
+                    }
+                });
+            }
+        })
+    );
+
+    // Show Environment Info command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.showEnvironmentInfo', async () => {
+            await environmentManager.showEnvironmentInfo(context);
+        })
+    );
+
+    // Install Dependencies command
+    context.subscriptions.push(
+        vscode.commands.registerCommand('robotframework.installDependencies', async () => {
+            await dependencyManager.installDependencies();
+        })
+    );
 }
 
 function showWelcomeMessage(context: vscode.ExtensionContext): void {

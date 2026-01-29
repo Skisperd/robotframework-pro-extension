@@ -430,5 +430,170 @@
       "    Log    Password: \\${${2:password}}"
     ],
     "description": "Create keyword with embedded arguments"
+  },
+  "Python Expression Variable": {
+    "prefix": "pyexpr",
+    "body": "\\${{ ${1:expression} }}",
+    "description": "Python expression variable (RF 5.0+)"
+  },
+  "Evaluate Python Expression": {
+    "prefix": "evalpy",
+    "body": "\\${${1:result}}=    Evaluate    ${2:expression}    modules=${3:os, sys}",
+    "description": "Evaluate Python expression with modules"
+  },
+  "Advanced Embedded Arguments Keyword": {
+    "prefix": "embeddedadv",
+    "body": [
+      "${1:User} \"\\${${2:username}}\" ${3:performs} \"\\${${4:action}}\" ${5:on} \"\\${${6:target}}\"",
+      "    [Documentation]    Keyword with multiple embedded arguments",
+      "    Log    User: \\${${2:username}}",
+      "    Log    Action: \\${${4:action}}",
+      "    Log    Target: \\${${6:target}}"
+    ],
+    "description": "Create keyword with multiple embedded arguments"
+  },
+  "FOR Loop Over Dictionary": {
+    "prefix": "fordict",
+    "body": [
+      "FOR    \\${${1:key}}    \\${${2:value}}    IN    &{${3:dictionary}}",
+      "    Log    \\${${1:key}}: \\${${2:value}}",
+      "END"
+    ],
+    "description": "FOR loop iterating over dictionary key-value pairs"
+  },
+  "Nested FOR Loops": {
+    "prefix": "fornested",
+    "body": [
+      "FOR    \\${${1:outer}}    IN    @{${2:outer_list}}",
+      "    FOR    \\${${3:inner}}    IN    @{${4:inner_list}}",
+      "        Log    \\${${1:outer}} - \\${${3:inner}}",
+      "    END",
+      "END"
+    ],
+    "description": "Nested FOR loops"
+  },
+  "WHILE Loop with BREAK": {
+    "prefix": "whilebreak",
+    "body": [
+      "WHILE    ${1:True}    limit=${2:100}",
+      "    \\${${3:condition}}=    ${4:Check Condition}",
+      "    IF    \\${${3:condition}}",
+      "        BREAK",
+      "    END",
+      "    ${5:Do Something}",
+      "END"
+    ],
+    "description": "WHILE loop with break condition"
+  },
+  "Keyword with Varargs": {
+    "prefix": "kwvarargs",
+    "body": [
+      "${1:Keyword With Varargs}",
+      "    [Documentation]    Keyword accepting variable number of arguments",
+      "    [Arguments]    @{${2:args}}",
+      "    FOR    \\${${3:arg}}    IN    @{${2:args}}",
+      "        Log    \\${${3:arg}}",
+      "    END"
+    ],
+    "description": "Create keyword with *args (varargs)"
+  },
+  "Keyword with Kwargs": {
+    "prefix": "kwkwargs",
+    "body": [
+      "${1:Keyword With Kwargs}",
+      "    [Documentation]    Keyword accepting keyword arguments",
+      "    [Arguments]    &{${2:kwargs}}",
+      "    FOR    \\${${3:key}}    \\${${4:value}}    IN    &{${2:kwargs}}",
+      "        Log    \\${${3:key}}=\\${${4:value}}",
+      "    END"
+    ],
+    "description": "Create keyword with **kwargs"
+  },
+  "Keyword with Mixed Arguments": {
+    "prefix": "kwmixed",
+    "body": [
+      "${1:Keyword With Mixed Args}",
+      "    [Documentation]    Keyword with positional, default, varargs, and kwargs",
+      "    [Arguments]    \\${${2:required}}    \\${${3:optional}}=${4:default}    @{${5:varargs}}    &{${6:kwargs}}",
+      "    Log    Required: \\${${2:required}}",
+      "    Log    Optional: \\${${3:optional}}",
+      "    Log    Varargs: @{${5:varargs}}",
+      "    Log    Kwargs: &{${6:kwargs}}"
+    ],
+    "description": "Create keyword with all argument types"
+  },
+  "Library with Alias": {
+    "prefix": "libalias",
+    "body": "Library    ${1:SeleniumLibrary}    WITH NAME    ${2:Browser}",
+    "description": "Import library with alias"
+  },
+  "Library with Arguments": {
+    "prefix": "libargs",
+    "body": "Library    ${1:DatabaseLibrary}    ${2:host}=${3:localhost}    ${4:port}=${5:5432}",
+    "description": "Import library with constructor arguments"
+  },
+  "Remote Library": {
+    "prefix": "libremote",
+    "body": "Library    Remote    http://${1:localhost}:${2:8270}    WITH NAME    ${3:RemoteLib}",
+    "description": "Import Remote library"
+  },
+  "TRY-EXCEPT with Specific Exceptions": {
+    "prefix": "tryspecific",
+    "body": [
+      "TRY",
+      "    ${1:Keyword That May Fail}",
+      "EXCEPT    ${2:ValueError}:*    AS    \\${${3:error}}",
+      "    Log    ValueError caught: \\${${3:error}}    level=WARN",
+      "EXCEPT    ${4:TypeError}:*    AS    \\${${5:error}}",
+      "    Log    TypeError caught: \\${${5:error}}    level=ERROR",
+      "EXCEPT    AS    \\${${6:error}}",
+      "    Log    Unknown error: \\${${6:error}}    level=ERROR",
+      "END"
+    ],
+    "description": "TRY-EXCEPT catching specific exception types"
+  },
+  "TRY-EXCEPT with Glob Pattern": {
+    "prefix": "tryglob",
+    "body": [
+      "TRY",
+      "    ${1:Keyword That May Fail}",
+      "EXCEPT    *${2:connection}*    type=GLOB    AS    \\${${3:error}}",
+      "    Log    Connection error: \\${${3:error}}    level=WARN",
+      "EXCEPT    *${4:timeout}*    type=GLOB    AS    \\${${5:error}}",
+      "    Log    Timeout error: \\${${5:error}}    level=WARN",
+      "END"
+    ],
+    "description": "TRY-EXCEPT with glob pattern matching"
+  },
+  "TRY-EXCEPT with Regex Pattern": {
+    "prefix": "tryregex",
+    "body": [
+      "TRY",
+      "    ${1:Keyword That May Fail}",
+      "EXCEPT    ${2:.*Error.*}    type=REGEXP    AS    \\${${3:error}}",
+      "    Log    Error matched: \\${${3:error}}",
+      "END"
+    ],
+    "description": "TRY-EXCEPT with regex pattern matching"
+  },
+  "Set Variable If": {
+    "prefix": "setvarif",
+    "body": "\\${${1:result}}=    Set Variable If    ${2:condition}    ${3:true_value}    ${4:false_value}",
+    "description": "Set variable conditionally"
+  },
+  "Create List": {
+    "prefix": "createlist",
+    "body": "@{${1:list}}=    Create List    ${2:item1}    ${3:item2}    ${4:item3}",
+    "description": "Create a list variable"
+  },
+  "Create Dictionary": {
+    "prefix": "createdict",
+    "body": "&{${1:dict}}=    Create Dictionary    ${2:key1}=${3:value1}    ${4:key2}=${5:value2}",
+    "description": "Create a dictionary variable"
+  },
+  "VAR with Scope": {
+    "prefix": "VARscope",
+    "body": "VAR    \\${${1:name}}    ${2:value}    scope=${3|LOCAL,TEST,TASK,SUITE,GLOBAL|}",
+    "description": "VAR statement with scope (RF 7.0+)"
   }
 }

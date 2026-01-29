@@ -6,7 +6,11 @@
     { "include": "#comments" },
     { "include": "#sections" },
     { "include": "#settings" },
+    { "include": "#line-continuation" },
+    { "include": "#python-expressions" },
+    { "include": "#extended-variables" },
     { "include": "#variables" },
+    { "include": "#embedded-keywords" },
     { "include": "#keywords" },
     { "include": "#test-cases" },
     { "include": "#control-flow" },
@@ -56,6 +60,61 @@
         }
       ]
     },
+    "line-continuation": {
+      "patterns": [
+        {
+          "name": "keyword.operator.continuation.robot",
+          "match": "^\\s*\\.\\.\\."
+        }
+      ]
+    },
+    "python-expressions": {
+      "patterns": [
+        {
+          "name": "meta.embedded.python.robot",
+          "begin": "(\\$\\{\\{)",
+          "end": "(\\}\\})",
+          "beginCaptures": {
+            "1": { "name": "punctuation.definition.variable.begin.robot" }
+          },
+          "endCaptures": {
+            "1": { "name": "punctuation.definition.variable.end.robot" }
+          },
+          "contentName": "source.python.embedded",
+          "patterns": [
+            {
+              "name": "variable.other.python.robot",
+              "match": "[^}]+"
+            }
+          ]
+        }
+      ]
+    },
+    "extended-variables": {
+      "patterns": [
+        {
+          "comment": "Variable with item access and/or attribute access: ${var}[key], ${var}.attr, ${var}[${idx}].name",
+          "name": "meta.variable.extended.robot",
+          "match": "(\\$\\{[^}]+\\})((?:\\[[^\\]]*\\]|\\.[a-zA-Z_][a-zA-Z0-9_]*)+)",
+          "captures": {
+            "1": { "name": "variable.parameter.robot" },
+            "2": { "name": "variable.other.property.robot" }
+          }
+        },
+        {
+          "comment": "Environment variable with default value: %{VAR=default}",
+          "name": "variable.environment.robot",
+          "match": "(%\\{)([^}=]+)(=?)([^}]*)(\\})",
+          "captures": {
+            "1": { "name": "punctuation.definition.variable.begin.robot" },
+            "2": { "name": "variable.other.environment.robot" },
+            "3": { "name": "keyword.operator.assignment.robot" },
+            "4": { "name": "string.unquoted.default.robot" },
+            "5": { "name": "punctuation.definition.variable.end.robot" }
+          }
+        }
+      ]
+    },
     "variables": {
       "patterns": [
         {
@@ -63,6 +122,32 @@
           "match": "(\\$\\{[^}]+\\}|\\@\\{[^}]+\\}|\\&\\{[^}]+\\}|\\%\\{[^}]+\\})",
           "captures": {
             "1": { "name": "variable.parameter.robot" }
+          }
+        }
+      ]
+    },
+    "embedded-keywords": {
+      "patterns": [
+        {
+          "comment": "Keyword definition with embedded arguments in name: User ${name} logs in",
+          "name": "meta.keyword.embedded.robot",
+          "match": "^([A-Z][A-Za-z0-9 _]*)(\\$\\{[^}]+\\})([A-Za-z0-9 _]*)(?=\\s*$)",
+          "captures": {
+            "1": { "name": "entity.name.function.keyword.robot" },
+            "2": { "name": "variable.parameter.embedded.robot" },
+            "3": { "name": "entity.name.function.keyword.robot" }
+          }
+        },
+        {
+          "comment": "Keyword definition with multiple embedded arguments",
+          "name": "meta.keyword.embedded.robot",
+          "match": "^([A-Z][A-Za-z0-9 _]*)(\\$\\{[^}]+\\})([A-Za-z0-9 _]*)(\\$\\{[^}]+\\})([A-Za-z0-9 _]*)(?=\\s*$)",
+          "captures": {
+            "1": { "name": "entity.name.function.keyword.robot" },
+            "2": { "name": "variable.parameter.embedded.robot" },
+            "3": { "name": "entity.name.function.keyword.robot" },
+            "4": { "name": "variable.parameter.embedded.robot" },
+            "5": { "name": "entity.name.function.keyword.robot" }
           }
         }
       ]

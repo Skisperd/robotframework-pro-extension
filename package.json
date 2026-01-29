@@ -160,6 +160,26 @@
         "command": "robotframework.reindexWorkspace",
         "title": "Reindex Workspace",
         "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.formatWithRobotidy",
+        "title": "Format with Robotidy",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.checkEnvironment",
+        "title": "Check Environment",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.showEnvironmentInfo",
+        "title": "Show Environment Info",
+        "category": "Robot Framework"
+      },
+      {
+        "command": "robotframework.installDependencies",
+        "title": "Install Dependencies",
+        "category": "Robot Framework"
       }
     ],
     "menus": {
@@ -349,6 +369,21 @@
           "default": [],
           "description": "List of Robocop rules to include (runs only these rules if specified)"
         },
+        "robotframework.robotidy.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable robotidy formatting integration"
+        },
+        "robotframework.robotidy.lineLength": {
+          "type": "number",
+          "default": 120,
+          "description": "Maximum line length for robotidy formatting"
+        },
+        "robotframework.formatting.formatOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically format Robot Framework files on save using robotidy"
+        },
         "robotframework.testExplorer.showTags": {
           "type": "boolean",
           "default": true,
@@ -358,6 +393,16 @@
           "type": "string",
           "default": "",
           "description": "Filter tests by tag pattern (e.g., 'smoke' or 'regression AND NOT slow')"
+        },
+        "robotframework.environment.validateOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate Robot Framework environment on extension startup"
+        },
+        "robotframework.environment.showNotifications": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notification messages about environment status"
         }
       }
     },
