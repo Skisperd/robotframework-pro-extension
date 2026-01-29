@@ -90,13 +90,33 @@ export class TestExecutor {
                 run.passed(test, result.duration);
             } else {
                 run.appendOutput(`${colors.brightRed}${colors.bold}✗ Test failed${colors.reset} ${colors.gray}(${result.duration}ms)${colors.reset}\r\n`);
+                
+                // Format error message with better visual separation and highlighting
                 if (result.message) {
-                    run.appendOutput(`${colors.red}Error: ${result.message}${colors.reset}\r\n`);
+                    run.appendOutput(`\r\n${colors.brightRed}${colors.bold}📋 ERROR DETAILS:${colors.reset}\r\n`);
+                    run.appendOutput(`${colors.brightRed}${colors.bold}${'═'.repeat(60)}${colors.reset}\r\n`);
+                    run.appendOutput(`${colors.brightRed}${result.message}${colors.reset}\r\n`);
+                    run.appendOutput(`${colors.brightRed}${colors.bold}${'═'.repeat(60)}${colors.reset}\r\n`);
                 }
-                // Show Expected vs Actual in the output if available
+                
+                // Show Expected vs Actual in a more organized layout
                 if (result.expected || result.actual) {
-                    run.appendOutput(`${colors.yellow}Expected:${colors.reset} ${result.expected || '(not specified)'}\r\n`);
-                    run.appendOutput(`${colors.yellow}Actual:${colors.reset}   ${result.actual || '(not specified)'}\r\n`);
+                    run.appendOutput(`\r\n${colors.yellow}${colors.bold}📊 COMPARISON RESULT:${colors.reset}\r\n`);
+                    run.appendOutput(`${colors.yellow}${'╔═══════════════════════════════════════════════════╗'}${colors.reset}\r\n`);
+                    
+                    run.appendOutput(`${colors.yellow}║${colors.reset} `);
+                    run.appendOutput(`${colors.green}${colors.bold}✓ Expected:${colors.reset}\r\n`);
+                    run.appendOutput(`${colors.yellow}║${colors.reset}   `);
+                    run.appendOutput(`${colors.brightGreen}${result.expected || '(not specified)'}${colors.reset}\r\n`);
+                    
+                    run.appendOutput(`${colors.yellow}${'╟───────────────────────────────────────────────────╢'}${colors.reset}\r\n`);
+                    
+                    run.appendOutput(`${colors.yellow}║${colors.reset} `);
+                    run.appendOutput(`${colors.red}${colors.bold}✗ Actual:${colors.reset}\r\n`);
+                    run.appendOutput(`${colors.yellow}║${colors.reset}   `);
+                    run.appendOutput(`${colors.brightRed}${result.actual || '(not specified)'}${colors.reset}\r\n`);
+                    
+                    run.appendOutput(`${colors.yellow}${'╚═══════════════════════════════════════════════════╝'}${colors.reset}\r\n`);
                 }
                 run.appendOutput('\r\n');
 
@@ -708,8 +728,17 @@ export class TestExecutor {
         let expected: string | undefined;
         let actual: string | undefined;
 
+        // Log raw input for debugging
+        this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Raw message: ${message}`);
+        this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Keyword: ${keywordName}`);
+        this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Args count: ${args.length}`);
+        if (args.length > 0) {
+            this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Args: ${JSON.stringify(args)}`);
+        }
+
         // Clean message first - remove stacktraces and excessive whitespace
         const cleanMessage = this._cleanMessage(message);
+        this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Clean message: ${cleanMessage}`);
 
         // Common patterns in Robot Framework failure messages:
         // "45.0 != 42.0" - numeric comparison
@@ -729,6 +758,7 @@ export class TestExecutor {
                 if (exceptionMsg) {
                     actual = `${exceptionType}: ${exceptionMsg}`;
                 }
+                this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Exception pattern matched: expected="${expected}", actual="${actual}"`);
                 return { expected, actual };
             }
         }
@@ -739,7 +769,7 @@ export class TestExecutor {
         if (neqMatch) {
             actual = neqMatch[1].trim();
             expected = neqMatch[2].trim();
-            this.outputChannel.appendLine(`[DEBUG] Pattern 1 matched: actual="${actual}", expected="${expected}"`);
+            this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Pattern 1 (!=) matched: actual="${actual}", expected="${expected}"`);
             return { expected, actual };
         }
         
@@ -795,13 +825,31 @@ export class TestExecutor {
             return { expected, actual };
         }
         
+        // Pattern 7: Look for comparison operators in the message (45.0 != 42.0)
+        const comparisonMatch = message.match(/([^\s,]+?)\s*(?:!=|==|<|>|<=|>=)\s*([^\s,]+?)(?:\s|,|$)/);
+        if (comparisonMatch) {
+            actual = comparisonMatch[1].trim();
+            expected = comparisonMatch[2].trim();
+            this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Comparison operator matched: actual="${actual}", expected="${expected}"`);
+            return { expected, actual };
+        }
+        
         // Generic fallback: use message parts
         const genericParts = message.split(/\s+(?:!=|is not|should be|expected|but was)\s+/i);
         if (genericParts.length >= 2) {
             actual = genericParts[0].trim().replace(/^['"]|['"]$/g, '');
             expected = genericParts.slice(1).join(' ').trim().replace(/^['"]|['"]$/g, '');
+            this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Generic fallback matched: actual="${actual}", expected="${expected}"`);
         }
         
+        // Pattern 8: Try to extract from arguments if everything else fails
+        if (!expected && !actual && args.length >= 2) {
+            actual = args[0];
+            expected = args[1];
+            this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Using arguments as fallback: actual="${actual}", expected="${expected}"`);
+        }
+        
+        this.outputChannel.appendLine(`[DEBUG parseExpectedActual] Final result: expected="${expected}", actual="${actual}"`);
         return { expected, actual };
     }
 

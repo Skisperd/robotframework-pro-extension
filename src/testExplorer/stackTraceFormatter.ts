@@ -35,8 +35,16 @@ export class StackTraceFormatter {
         // Sort by depth (shallowest first, deepest last)
         const sortedStack = [...callStack].sort((a, b) => a.depth - b.depth);
 
-        // Clean format - one line per frame, minimal indentation
-        for (const frame of sortedStack) {
+        // Add header
+        lines.push('╔════════════════════════════════════════════════════════════╗');
+        lines.push('║                    CALL STACK TRACE                        ║');
+        lines.push('╚════════════════════════════════════════════════════════════╝');
+        lines.push('');
+
+        // Clean format - one line per frame, with depth-based indentation
+        for (let i = 0; i < sortedStack.length; i++) {
+            const frame = sortedStack[i];
+            
             // Skip frames without source (library keywords without line info)
             if (!frame.source || frame.lineno === 0) {
                 continue;
@@ -44,19 +52,28 @@ export class StackTraceFormatter {
 
             const fileName = path.basename(frame.source);
             const displayName = frame.kwname || frame.name;
+            const indent = '  '.repeat(frame.depth);
+            const isLast = i === sortedStack.length - 1;
+            const prefix = isLast ? '└──' : '├──';
 
             if (frame.is_failure_point) {
-                // Failure point - highlight with [FAILED]
-                lines.push(`→ ${displayName} (${fileName}:${frame.lineno}) [FAILED]`);
+                // Failure point - highlight with error marker
+                lines.push(`${indent}${prefix} ❌ ${displayName}`);
+                lines.push(`${indent}    📍 ${fileName}:${frame.lineno}`);
 
                 // Show clean error message on next line
                 if (frame.message) {
                     const cleanMessage = this._cleanErrorMessage(frame.message);
-                    lines.push(`  Error: ${cleanMessage}`);
+                    lines.push(`${indent}    📌 Error: ${cleanMessage}`);
                 }
             } else {
-                // Parent call - just name and location
-                lines.push(`→ ${displayName} (${fileName}:${frame.lineno})`);
+                // Parent call - show as normal step
+                lines.push(`${indent}${prefix} ▶ ${displayName}`);
+                lines.push(`${indent}    📍 ${fileName}:${frame.lineno}`);
+            }
+            
+            if (i < sortedStack.length - 1) {
+                lines.push('');
             }
         }
 
