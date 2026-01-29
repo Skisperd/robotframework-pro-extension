@@ -21,7 +21,7 @@ export interface StackFrame {
 
 export class StackTraceFormatter {
     /**
-     * Format call stack as Python-style traceback (compact version)
+     * Format call stack as clean traceback for Test Results panel
      * @param callStack Array of stack frames from listener
      * @returns Formatted stack trace string
      */
@@ -35,7 +35,7 @@ export class StackTraceFormatter {
         // Sort by depth (shallowest first, deepest last)
         const sortedStack = [...callStack].sort((a, b) => a.depth - b.depth);
 
-        // Compact format - one line per frame
+        // Clean format - one line per frame, minimal indentation
         for (const frame of sortedStack) {
             // Skip frames without source (library keywords without line info)
             if (!frame.source || frame.lineno === 0) {
@@ -44,20 +44,19 @@ export class StackTraceFormatter {
 
             const fileName = path.basename(frame.source);
             const displayName = frame.kwname || frame.name;
-            const indent = '  '.repeat(frame.depth - 1);
 
             if (frame.is_failure_point) {
-                // Failure point - with line number
-                lines.push(`${indent}→ ${displayName} (${fileName}:${frame.lineno}) [FAILED]`);
+                // Failure point - highlight with [FAILED]
+                lines.push(`→ ${displayName} (${fileName}:${frame.lineno}) [FAILED]`);
 
-                // Show clean error message (truncated)
+                // Show clean error message on next line
                 if (frame.message) {
                     const cleanMessage = this._cleanErrorMessage(frame.message);
-                    lines.push(`${indent}  Error: ${cleanMessage}`);
+                    lines.push(`  Error: ${cleanMessage}`);
                 }
             } else {
                 // Parent call - just name and location
-                lines.push(`${indent}→ ${displayName} (${fileName}:${frame.lineno})`);
+                lines.push(`→ ${displayName} (${fileName}:${frame.lineno})`);
             }
         }
 

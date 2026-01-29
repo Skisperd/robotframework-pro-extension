@@ -499,12 +499,11 @@ export class TestExecutor {
                         expected = exp;
                         actual = act;
 
-                        // Format full stack trace
+                        // Format clean stack trace (no duplicate call path)
                         const stackTrace = StackTraceFormatter.formatStackTrace(callStack);
-                        const compactTrace = StackTraceFormatter.formatCompactStackTrace(callStack);
 
-                        // Build detailed message with stack trace
-                        message = `${stackTrace}\n\nCall path: ${compactTrace}`;
+                        // Build detailed message with stack trace only
+                        message = stackTrace;
 
                         this.outputChannel.appendLine(`[DEBUG] Stack trace:\n${stackTrace}`);
                         this.outputChannel.appendLine(`[DEBUG] Expected: ${expected}, Actual: ${actual}`);
