@@ -54,9 +54,9 @@ export class EnvironmentManager implements vscode.Disposable {
         if (info.pythonVersion) {
             try {
                 const rfResult = await this.executeCommand(pythonPath, ['-m', 'robot', '--version']);
-                if (rfResult.exitCode === 0) {
-                    // Robot Framework version is in stdout or stderr depending on version
-                    const version = rfResult.stdout.trim() || rfResult.stderr.trim();
+                // robot --version may return non-zero exit code, check output instead
+                const version = rfResult.stdout.trim() || rfResult.stderr.trim();
+                if (version && version.toLowerCase().includes('robot framework')) {
                     info.robotFrameworkVersion = this.extractVersion(version, 'Robot Framework');
                     this.outputChannel.appendLine(`Robot Framework found: ${info.robotFrameworkVersion}`);
                 } else {
@@ -69,8 +69,10 @@ export class EnvironmentManager implements vscode.Disposable {
             // Check Robocop
             try {
                 const robocopResult = await this.executeCommand(pythonPath, ['-m', 'robocop', '--version']);
-                if (robocopResult.exitCode === 0) {
-                    info.robocopVersion = robocopResult.stdout.trim() || robocopResult.stderr.trim();
+                // Check output instead of exit code
+                const robocopVersion = robocopResult.stdout.trim() || robocopResult.stderr.trim();
+                if (robocopVersion && (robocopVersion.includes('Robocop') || robocopVersion.match(/^\d+\.\d+/))) {
+                    info.robocopVersion = robocopVersion;
                     this.outputChannel.appendLine(`Robocop found: ${info.robocopVersion}`);
                 }
             } catch {
@@ -80,8 +82,10 @@ export class EnvironmentManager implements vscode.Disposable {
             // Check Robotidy
             try {
                 const robotidyResult = await this.executeCommand(pythonPath, ['-m', 'robotidy', '--version']);
-                if (robotidyResult.exitCode === 0) {
-                    info.robotidyVersion = robotidyResult.stdout.trim() || robotidyResult.stderr.trim();
+                // Check output instead of exit code
+                const robotidyVersion = robotidyResult.stdout.trim() || robotidyResult.stderr.trim();
+                if (robotidyVersion && (robotidyVersion.includes('robotidy') || robotidyVersion.match(/^\d+\.\d+/))) {
+                    info.robotidyVersion = robotidyVersion;
                     this.outputChannel.appendLine(`Robotidy found: ${info.robotidyVersion}`);
                 }
             } catch {
