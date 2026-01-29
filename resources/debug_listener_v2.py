@@ -100,17 +100,48 @@ class DebugListener:
 
     def start_test(self, name: str, attributes: Dict[str, Any]):
         """Called when a test starts"""
-        self._log(f"\n{self.MAGENTA}{self.BOLD}[TEST START]{self.RESET} {self.WHITE}{name}{self.RESET}")
+        # Draw test start box
+        self._log("")
+        self._log(f"{self.CYAN}{'╔' + '═' * 78 + '╗'}{self.RESET}")
+        self._log(f"{self.CYAN}║{self.RESET} {self.MAGENTA}{self.BOLD}🧪 TEST START{self.RESET}")
+        self._log(f"{self.CYAN}║{self.RESET} {self.WHITE}{self.BOLD}{name}{self.RESET}")
+
+        # Show tags if present
+        tags = attributes.get('tags', [])
+        if tags:
+            tags_str = ', '.join(tags[:5])
+            if len(tags) > 5:
+                tags_str += f" +{len(tags) - 5} more"
+            self._log(f"{self.CYAN}║{self.RESET} {self.DIM}Tags: {tags_str}{self.RESET}")
+
+        self._log(f"{self.CYAN}{'╚' + '═' * 78 + '╝'}{self.RESET}")
+        self._log("")
+
         self.keyword_stack = []
         self.current_depth = 0
 
     def end_test(self, name: str, attributes: Dict[str, Any]):
         """Called when a test ends"""
         status = attributes.get('status', 'PASS')
+        message = attributes.get('message', '')
+
+        # Draw test result box
+        self._log("")
         if status == 'PASS':
-            self._log(f"{self.GREEN}{self.BOLD}[TEST PASS]{self.RESET} {name}")
+            self._log(f"{self.GREEN}{'╔' + '═' * 78 + '╗'}{self.RESET}")
+            self._log(f"{self.GREEN}║{self.RESET} {self.GREEN}{self.BOLD}✓ TEST PASSED{self.RESET}")
+            self._log(f"{self.GREEN}║{self.RESET} {self.WHITE}{name}{self.RESET}")
+            self._log(f"{self.GREEN}{'╚' + '═' * 78 + '╝'}{self.RESET}")
         else:
-            self._log(f"{self.RED}{self.BOLD}[TEST FAIL]{self.RESET} {name}")
+            self._log(f"{self.RED}{'╔' + '═' * 78 + '╗'}{self.RESET}")
+            self._log(f"{self.RED}║{self.RESET} {self.RED}{self.BOLD}✗ TEST FAILED{self.RESET}")
+            self._log(f"{self.RED}║{self.RESET} {self.WHITE}{name}{self.RESET}")
+            if message:
+                # Show first line of error
+                first_line = message.split('\n')[0][:70]
+                self._log(f"{self.RED}║{self.RESET} {self.RED}{first_line}{self.RESET}")
+            self._log(f"{self.RED}{'╚' + '═' * 78 + '╝'}{self.RESET}")
+        self._log("")
 
     def start_keyword(self, name: str, attributes: Dict[str, Any]):
         """Called when a keyword starts - check for breakpoints and pause if needed"""
@@ -119,6 +150,7 @@ class DebugListener:
         source = attributes.get('source', '')
         lineno = attributes.get('lineno', 0)
         args = attributes.get('args', [])
+        kw_type = attributes.get('type', 'KEYWORD')
 
         # Push to stack
         keyword_frame = {
@@ -127,19 +159,95 @@ class DebugListener:
             'source': source,
             'lineno': lineno,
             'args': args,
-            'depth': self.current_depth
+            'depth': self.current_depth,
+            'type': kw_type
         }
         self.keyword_stack.append(keyword_frame)
 
-        # Log keyword execution
+        # Log keyword execution with type-specific formatting
         display_name = attributes.get('kwname', name)
+        indent = "  " * (self.current_depth - 1)
+
+        # Choose icon and color based on keyword type
+        if kw_type == 'SETUP':
+            icon = "🔧"
+            color = self.YELLOW
+            type_label = f"{self.YELLOW}[SETUP]{self.RESET}"
+        elif kw_type == 'TEARDOWN':
+            icon = "🧹"
+            color = self.YELLOW
+            type_label = f"{self.YELLOW}[TEARDOWN]{self.RESET}"
+        elif kw_type == 'FOR':
+            icon = "🔄"
+            color = self.CYAN
+            type_label = f"{self.CYAN}[FOR]{self.RESET}"
+        elif kw_type == 'FOR ITERATION':
+            icon = "  ↻"
+            color = self.CYAN
+            type_label = f"{self.DIM}{self.CYAN}[ITER]{self.RESET}"
+        elif kw_type == 'IF':
+            icon = "❓"
+            color = self.MAGENTA
+            type_label = f"{self.MAGENTA}[IF]{self.RESET}"
+        elif kw_type == 'ELSE IF':
+            icon = "❔"
+            color = self.MAGENTA
+            type_label = f"{self.MAGENTA}[ELIF]{self.RESET}"
+        elif kw_type == 'ELSE':
+            icon = "❕"
+            color = self.MAGENTA
+            type_label = f"{self.MAGENTA}[ELSE]{self.RESET}"
+        elif kw_type == 'TRY':
+            icon = "🎯"
+            color = self.BLUE
+            type_label = f"{self.BLUE}[TRY]{self.RESET}"
+        elif kw_type == 'EXCEPT':
+            icon = "⚠️"
+            color = self.YELLOW
+            type_label = f"{self.YELLOW}[EXCEPT]{self.RESET}"
+        elif kw_type == 'FINALLY':
+            icon = "✓"
+            color = self.BLUE
+            type_label = f"{self.BLUE}[FINALLY]{self.RESET}"
+        else:
+            icon = "→"
+            color = self.BLUE
+            type_label = ""
+
+        # Format arguments with type detection
         args_str = ""
         if args:
-            args_list = [str(a)[:30] for a in args[:3]]
-            args_str = f" {self.GRAY}({', '.join(args_list)}{'...' if len(args) > 3 else ''}){self.RESET}"
+            formatted_args = []
+            for arg in args[:4]:  # Show up to 4 args
+                arg_str = str(arg)
+                if len(arg_str) > 40:
+                    arg_str = arg_str[:37] + "..."
 
-        indent = "  " * (self.current_depth - 1)
-        self._log(f"{indent}{self.BLUE}→{self.RESET} {display_name}{args_str} {self.GRAY}[{lineno}]{self.RESET}")
+                # Detect and color-code argument types
+                if arg_str.startswith('${') or arg_str.startswith('@{') or arg_str.startswith('&{'):
+                    # Variable
+                    formatted_args.append(f"{self.GREEN}{arg_str}{self.RESET}")
+                elif arg_str.isdigit() or (arg_str.replace('.', '').replace('-', '').isdigit()):
+                    # Number
+                    formatted_args.append(f"{self.CYAN}{arg_str}{self.RESET}")
+                elif arg_str.lower() in ('true', 'false', 'none', 'null'):
+                    # Boolean/None
+                    formatted_args.append(f"{self.MAGENTA}{arg_str}{self.RESET}")
+                else:
+                    # String
+                    formatted_args.append(f"{self.WHITE}{arg_str}{self.RESET}")
+
+            if len(args) > 4:
+                formatted_args.append(f"{self.DIM}+{len(args) - 4} more{self.RESET}")
+
+            args_str = f" {self.GRAY}({self.RESET}{', '.join(formatted_args)}{self.GRAY}){self.RESET}"
+
+        # Build the log line
+        line_info = f"{self.DIM}:{lineno}{self.RESET}" if lineno > 0 else ""
+        if type_label:
+            self._log(f"{indent}{icon} {type_label} {color}{self.BOLD}{display_name}{self.RESET}{args_str}{line_info}")
+        else:
+            self._log(f"{indent}{icon} {color}{display_name}{self.RESET}{args_str}{line_info}")
 
         # Check for breakpoint
         if source and lineno > 0:
@@ -162,6 +270,7 @@ class DebugListener:
     def end_keyword(self, name: str, attributes: Dict[str, Any]):
         """Called when a keyword ends"""
         status = attributes.get('status', 'PASS')
+        kw_type = attributes.get('type', 'KEYWORD')
 
         # Check step out
         if self.stepping_mode == 'out' and self.current_depth == self.step_depth:
@@ -170,14 +279,33 @@ class DebugListener:
             self._pause_execution(reason)
             self.stepping_mode = None
 
-        # Log failure
+        # Log keyword completion
+        display_name = attributes.get('kwname', name)
+        indent = "  " * (self.current_depth - 1)
+
         if status == 'FAIL':
             message = attributes.get('message', '')
-            display_name = attributes.get('kwname', name)
-            indent = "  " * (self.current_depth - 1)
-            self._log(f"{indent}{self.BG_RED}{self.WHITE}{self.BOLD} FAILED {self.RESET} {self.RED}{display_name}{self.RESET}")
+
+            # Enhanced failure display with box
+            self._log(f"{indent}{self.BG_RED}{self.WHITE}{self.BOLD} ✗ FAILED {self.RESET} {self.RED}{self.BOLD}{display_name}{self.RESET}")
+
             if message:
-                self._log(f"{indent}  {self.RED}{message[:200]}{self.RESET}")
+                # Clean and format error message
+                lines = message.split('\n')
+                clean_lines = []
+                for line in lines[:5]:  # Show max 5 lines
+                    line = line.strip()
+                    if line and not line.startswith('0x') and not line.startswith('Stacktrace:'):
+                        clean_lines.append(line)
+
+                for line in clean_lines:
+                    if len(line) > 100:
+                        line = line[:97] + '...'
+                    self._log(f"{indent}  {self.RED}│{self.RESET} {line}")
+
+        elif status == 'PASS' and kw_type in ('SETUP', 'TEARDOWN', 'FOR', 'IF', 'TRY'):
+            # Show completion for control structures
+            self._log(f"{indent}{self.GREEN}✓{self.RESET} {self.DIM}{display_name} completed{self.RESET}")
 
         # Pop from stack
         if self.keyword_stack:
@@ -186,16 +314,34 @@ class DebugListener:
 
     def _pause_execution(self, reason: str):
         """Pause execution and wait for user command"""
-        self._log(f"\n{self.YELLOW}{self.BOLD}⏸  DEBUG PAUSE{self.RESET} {self.YELLOW}{reason}{self.RESET}\n")
+        # Draw pause box
+        self._log("")
+        self._log(f"{self.YELLOW}{'═' * 60}{self.RESET}")
+        self._log(f"{self.YELLOW}║{self.RESET} {self.YELLOW}{self.BOLD}⏸  EXECUTION PAUSED{self.RESET}")
+        self._log(f"{self.YELLOW}║{self.RESET} {self.WHITE}{reason}{self.RESET}")
+        self._log(f"{self.YELLOW}{'═' * 60}{self.RESET}")
+
+        # Show current call stack
+        if self.keyword_stack:
+            self._log(f"{self.CYAN}📍 Call Stack:{self.RESET}")
+            for i, frame in enumerate(self.keyword_stack[-3:]):  # Show last 3
+                depth_marker = "  " * i
+                self._log(f"  {depth_marker}→ {self.DIM}{frame['name']} ({frame.get('lineno', 0)}){self.RESET}")
 
         # Export current variables
-        self._export_variables()
+        var_count = self._export_variables()
+        if var_count > 0:
+            self._log(f"{self.GREEN}✓{self.RESET} {self.DIM}Exported {var_count} variables{self.RESET}")
+
+        self._log(f"{self.YELLOW}{'─' * 60}{self.RESET}")
+        self._log(f"{self.DIM}Waiting for command (Continue/Step Over/Into/Out)...{self.RESET}")
+        self._log("")
 
         # Create pause marker file
         try:
             self.pause_file.write_text(reason, encoding='utf-8')
         except Exception as e:
-            self._log(f"{self.RED}[DEBUG ERROR] Failed to create pause file: {e}{self.RESET}")
+            self._log(f"{self.RED}[ERROR] Failed to create pause file: {e}{self.RESET}")
             return
 
         # Poll for continue signal or step command
@@ -215,24 +361,25 @@ class DebugListener:
                     if command == 'over':
                         self.stepping_mode = 'over'
                         self.step_depth = self.current_depth
-                        self._log(f"{self.CYAN}▶  Step Over{self.RESET}")
+                        self._log(f"{self.CYAN}{self.BOLD}▶ Step Over{self.RESET} (depth={self.current_depth})")
                     elif command == 'into':
                         self.stepping_mode = 'into'
-                        self._log(f"{self.CYAN}▶  Step Into{self.RESET}")
+                        self._log(f"{self.CYAN}{self.BOLD}▶ Step Into{self.RESET}")
                     elif command == 'out':
                         self.stepping_mode = 'out'
                         self.step_depth = self.current_depth - 1
-                        self._log(f"{self.CYAN}▶  Step Out{self.RESET}")
+                        self._log(f"{self.CYAN}{self.BOLD}▶ Step Out{self.RESET} (to depth={self.current_depth - 1})")
 
                     self.step_file.unlink()
                     break
                 except Exception as e:
-                    self._log(f"{self.RED}[DEBUG ERROR] Failed to read step command: {e}{self.RESET}")
+                    self._log(f"{self.RED}[ERROR] Failed to read step command: {e}{self.RESET}")
 
         # Resumed
-        self._log(f"{self.GREEN}▶  Resumed{self.RESET}\n")
+        self._log(f"{self.GREEN}{self.BOLD}▶ Execution Resumed{self.RESET}")
+        self._log("")
 
-    def _export_variables(self):
+    def _export_variables(self) -> int:
         """Export current Robot Framework variables to JSON"""
         try:
             from robot.libraries.BuiltIn import BuiltIn
@@ -272,10 +419,11 @@ class DebugListener:
             with open(self.variable_file, 'w', encoding='utf-8') as f:
                 json.dump(variables, f, indent=2, ensure_ascii=False)
 
-            self._log(f"{self.GRAY}Exported {sum(len(v) for v in variables.values())} variable(s){self.RESET}")
+            return sum(len(v) for v in variables.values())
 
         except Exception as e:
-            self._log(f"{self.RED}[DEBUG ERROR] Failed to export variables: {e}{self.RESET}")
+            self._log(f"{self.RED}[ERROR] Failed to export variables: {e}{self.RESET}")
+            return 0
 
     def log_message(self, message: Dict[str, Any]):
         """Called for log messages - show warnings and errors"""

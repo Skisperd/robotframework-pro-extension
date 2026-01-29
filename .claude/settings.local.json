@@ -19,7 +19,9 @@
       "Bash(npm run package:*)",
       "Bash(npx vsce:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(find:*)",
+      "Bash(git push)"
     ]
   }
 }
