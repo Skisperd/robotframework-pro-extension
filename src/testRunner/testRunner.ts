@@ -90,18 +90,27 @@ export class TestRunner {
         this._statusBarItem.text = '$(sync~spin) Running Robot Framework...';
         this._statusBarItem.show();
 
-        // Spawn process
+        // Spawn process with UTF-8 encoding
         this._currentProcess = spawn(pythonExecutable, args, {
             cwd: cwd,
-            shell: true
+            shell: true,
+            env: {
+                ...process.env,
+                PYTHONIOENCODING: 'utf-8',
+                PYTHONLEGACYWINDOWSSTDIO: '0'
+            }
         });
 
-        this._currentProcess.stdout?.on('data', (data) => {
-            this._outputChannel.append(data.toString());
+        // Set encoding for stdout/stderr streams
+        this._currentProcess.stdout?.setEncoding('utf8');
+        this._currentProcess.stderr?.setEncoding('utf8');
+
+        this._currentProcess.stdout?.on('data', (data: string) => {
+            this._outputChannel.append(data);
         });
 
-        this._currentProcess.stderr?.on('data', (data) => {
-            this._outputChannel.append(data.toString());
+        this._currentProcess.stderr?.on('data', (data: string) => {
+            this._outputChannel.append(data);
         });
 
         this._currentProcess.on('exit', (code) => {

@@ -236,11 +236,21 @@ export class TestExecutor {
             let errorOutput = '';
 
             // Don't use shell:true - let spawn handle arguments properly
+            // Set UTF-8 encoding for proper character display
             this.currentProcess = spawn(pythonExecutable, args, {
                 cwd: cwd,
                 shell: false,
-                windowsHide: true
+                windowsHide: true,
+                env: {
+                    ...process.env,
+                    PYTHONIOENCODING: 'utf-8',
+                    PYTHONLEGACYWINDOWSSTDIO: '0'
+                }
             });
+
+            // Set encoding for stdout/stderr streams
+            this.currentProcess.stdout?.setEncoding('utf8');
+            this.currentProcess.stderr?.setEncoding('utf8');
 
             // Handle cancellation
             token.onCancellationRequested(() => {
@@ -250,21 +260,19 @@ export class TestExecutor {
                 }
             });
 
-            this.currentProcess.stdout?.on('data', (data) => {
-                const text = data.toString();
-                output += text;
-                this.outputChannel.append(text);
+            this.currentProcess.stdout?.on('data', (data: string) => {
+                output += data;
+                this.outputChannel.append(data);
                 // Send colorized output to test run in real-time
-                const colorizedText = this.colorizeRobotOutput(text);
+                const colorizedText = this.colorizeRobotOutput(data);
                 run.appendOutput(colorizedText.replace(/\n/g, '\r\n'));
             });
 
-            this.currentProcess.stderr?.on('data', (data) => {
-                const text = data.toString();
-                errorOutput += text;
-                this.outputChannel.append(text);
+            this.currentProcess.stderr?.on('data', (data: string) => {
+                errorOutput += data;
+                this.outputChannel.append(data);
                 // Send error output in red
-                run.appendOutput(`${colors.red}${text.replace(/\n/g, '\r\n')}${colors.reset}`);
+                run.appendOutput(`${colors.red}${data.replace(/\n/g, '\r\n')}${colors.reset}`);
             });
 
             this.currentProcess.on('exit', (code) => {
