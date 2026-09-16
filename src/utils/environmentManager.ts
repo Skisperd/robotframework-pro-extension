@@ -321,8 +321,8 @@ export class EnvironmentManager implements vscode.Disposable {
         } else if (!info.robocopVersion || !info.robotidyVersion) {
             // Optional dependencies missing
             const missing: string[] = [];
-            if (!info.robocopVersion) missing.push('Robocop (linting)');
-            if (!info.robotidyVersion) missing.push('Robotidy (formatting)');
+            if (!info.robocopVersion) {missing.push('Robocop (linting)');}
+            if (!info.robotidyVersion) {missing.push('Robotidy (formatting)');}
 
             vscode.window.showInformationMessage(
                 `Robot Framework ready. Optional: ${missing.join(', ')} not installed.`,

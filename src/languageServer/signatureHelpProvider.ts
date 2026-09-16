@@ -46,7 +46,7 @@ export class RobotSignatureHelpProvider implements vscode.SignatureHelpProvider 
         const indentLength = text.length - trimmed.length;
 
         // Match keyword name at beginning (before any arguments)
-        const match = trimmed.match(/^([\w\s\-\.]+?)(?:\s{2,}|\t|$)/);
+        const match = trimmed.match(/^([\w\s\-.]+?)(?:\s{2,}|\t|$)/);
         if (match) {
             return {
                 name: match[1].trim(),

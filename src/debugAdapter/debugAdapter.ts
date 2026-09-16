@@ -41,7 +41,7 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
     private _variableFile: string = '';
     private _stepFile: string = '';
     private _pauseWatcher: fs.FSWatcher | undefined;
-    private _currentVariables: any = {};
+    private _currentVariables: Record<string, unknown> = {};
 
     public constructor() {
         super();
@@ -289,8 +289,8 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
                 { name: '${CURDIR}', value: this._cwd || '', variablesReference: 0 },
                 { name: '${TEMPDIR}', value: process.env.TEMP || '/tmp', variablesReference: 0 },
                 { name: '${EXECDIR}', value: this._cwd || '', variablesReference: 0 },
-                { name: '${/}', value: require('path').sep, variablesReference: 0 },
-                { name: '${:}', value: require('path').delimiter, variablesReference: 0 },
+                { name: '${/}', value: path.sep, variablesReference: 0 },
+                { name: '${:}', value: path.delimiter, variablesReference: 0 },
                 { name: '${SPACE}', value: ' ', variablesReference: 0 },
                 { name: '${EMPTY}', value: '', variablesReference: 0 },
                 { name: '${True}', value: 'True', variablesReference: 0 },
@@ -378,7 +378,7 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
             '${SUITE NAME}': this._currentSuiteName || 'Unknown'
         };
 
-        if (builtinVars.hasOwnProperty(expression)) {
+        if (Object.prototype.hasOwnProperty.call(builtinVars, expression)) {
             response.body = {
                 result: builtinVars[expression],
                 variablesReference: 0
@@ -433,7 +433,7 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
         /**
          * Write breakpoints to JSON file for listener to read
          */
-        if (!this._breakpointFile) return;
+        if (!this._breakpointFile) {return;}
 
         const data: Record<string, number[]> = {};
         for (const [sourcePath, lines] of this._breakpoints) {
@@ -453,7 +453,7 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
         /**
          * Setup file watcher to detect when listener pauses execution
          */
-        if (!this._pauseFile) return;
+        if (!this._pauseFile) {return;}
 
         const watchDir = path.dirname(this._pauseFile);
 
@@ -485,7 +485,7 @@ export class RobotFrameworkDebugSession extends LoggingDebugSession {
         }
     }
 
-    private _loadVariablesFromFile(): any {
+    private _loadVariablesFromFile(): Record<string, unknown> | null {
         /**
          * Load current variables from JSON file exported by listener
          */

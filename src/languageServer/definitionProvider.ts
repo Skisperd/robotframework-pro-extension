@@ -100,7 +100,7 @@ export class RobotDefinitionProvider implements vscode.DefinitionProvider {
         }
 
         // Fallback: try word at position with a simpler regex
-        const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z][A-Za-z0-9_\s\-\.]*[A-Za-z0-9]/);
+        const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z][A-Za-z0-9_\s\-.]*[A-Za-z0-9]/);
         if (wordRange) {
             const word = document.getText(wordRange).trim();
             console.log('Fallback - Looking for word:', word);
@@ -149,7 +149,7 @@ export class RobotDefinitionProvider implements vscode.DefinitionProvider {
 
     private getVariableAtPosition(line: string, charPos: number): string | null {
         // Match variables: ${VAR}, @{LIST}, &{DICT}, %{ENV}
-        const variableRegex = /[\$@&%]\{[^}]+\}/g;
+        const variableRegex = /[$@&%]\{[^}]+\}/g;
         let match;
         while ((match = variableRegex.exec(line)) !== null) {
             const start = match.index;
@@ -183,11 +183,11 @@ export class RobotDefinitionProvider implements vscode.DefinitionProvider {
                 // Found the cell, check if it looks like a keyword
                 const trimmed = cell.trim();
                 // Skip if it's a variable assignment, setting, or empty
-                if (trimmed.match(/^[\$@&%]\{/) || trimmed.startsWith('[') || trimmed === '') {
+                if (trimmed.match(/^[$@&%]\{/) || trimmed.startsWith('[') || trimmed === '') {
                     return null;
                 }
                 // Skip if it's just a variable assignment like ${result}=
-                if (trimmed.match(/^[\$@&%]\{[^}]+\}=?\s*$/)) {
+                if (trimmed.match(/^[$@&%]\{[^}]+\}=?\s*$/)) {
                     return null;
                 }
                 return trimmed;

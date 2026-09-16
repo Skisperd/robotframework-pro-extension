@@ -9,7 +9,7 @@ export class RobotHoverProvider implements vscode.HoverProvider {
         position: vscode.Position,
         _token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.Hover> {
-        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-\.]+/);
+        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-.]+/);
         if (!wordRange) {
             return null;
         }
@@ -17,7 +17,7 @@ export class RobotHoverProvider implements vscode.HoverProvider {
         const word = document.getText(wordRange).trim();
 
         // Check if it's a variable
-        if (word.match(/^[\$@&]\{[^}]+\}$/)) {
+        if (word.match(/^[$@&]\{[^}]+\}$/)) {
             return this.createVariableHover(word, wordRange);
         }
 

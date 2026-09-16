@@ -346,7 +346,7 @@ export class ReportViewerProvider {
                 // Use provided context or create a minimal one
                 const provider = context
                     ? new ReportViewerProvider(context)
-                    : new ReportViewerProvider({ subscriptions: [] } as any);
+                    : new ReportViewerProvider({ subscriptions: [] } as unknown as vscode.ExtensionContext);
                 await provider.showReport(sortedFiles[0].file.fsPath, reportType);
                 return true;
             }

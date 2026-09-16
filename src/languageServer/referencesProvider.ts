@@ -10,7 +10,7 @@ export class RobotReferencesProvider implements vscode.ReferenceProvider {
         context: vscode.ReferenceContext,
         _token: vscode.CancellationToken
     ): Promise<vscode.Location[]> {
-        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-\.]+/);
+        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-.]+/);
         if (!wordRange) {
             return [];
         }
@@ -18,7 +18,7 @@ export class RobotReferencesProvider implements vscode.ReferenceProvider {
         const word = document.getText(wordRange).trim();
 
         // Check if it's a variable
-        if (word.match(/^[\$@&]\{[^}]+\}$/)) {
+        if (word.match(/^[$@&]\{[^}]+\}$/)) {
             return this.findVariableReferences(word);
         }
 

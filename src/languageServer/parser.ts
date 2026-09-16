@@ -123,7 +123,7 @@ export class RobotParser {
         }
 
         const lineText = lines[line];
-        const wordRegex = /[\w${}\[\]@&]+/g;
+        const wordRegex = /[\w${}[\]@&]+/g;
         let match;
 
         while ((match = wordRegex.exec(lineText)) !== null) {

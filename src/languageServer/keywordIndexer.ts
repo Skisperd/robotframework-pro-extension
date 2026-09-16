@@ -480,7 +480,7 @@ export class KeywordIndexer {
     }
 
     private parseVariable(line: string, document: vscode.TextDocument, lineNumber: number): void {
-        const varMatch = line.match(/^([\$@&]\{[^}]+\})\s*(.*)/);
+        const varMatch = line.match(/^([$@&]\{[^}]+\})\s*(.*)/);
         if (varMatch) {
             const [, name, value] = varMatch;
             const location = new vscode.Location(

@@ -21,13 +21,18 @@ import { DependencyManager } from './utils/dependencyManager';
 
 let client: LanguageClient;
 let testRunner: TestRunner;
-// @ts-ignore - testController is used for its side effects (registering test explorer)
+// Held at module scope only to keep the instance alive for its side effects
+// (registering the Test Explorer); nothing here reads it afterwards.
+// @ts-expect-error - assigned but intentionally never read, see comment above
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let testController: RobotFrameworkTestController;
 let outputChannel: vscode.OutputChannel;
 let keywordIndexer: KeywordIndexer;
-// @ts-ignore - robocopIntegration will be used for future diagnostics integration
 let robocopIntegration: RobocopIntegration;
-// @ts-ignore - reportViewer is used for report viewing commands
+// Held at module scope only to keep the instance alive for its side effects
+// (registering report-viewing commands); nothing here reads it afterwards.
+// @ts-expect-error - assigned but intentionally never read, see comment above
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 let reportViewer: ReportViewerProvider;
 let workspaceManager: MultiRootWorkspaceManager;
 let failureTreeProvider: FailureTreeProvider;

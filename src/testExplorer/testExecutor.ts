@@ -39,7 +39,11 @@ export class TestExecutor {
     }
 
     private updateFailureTreeView(testName: string, callStack: StackFrame[]): void {
-        // Import getFailureTreeProvider dynamically to avoid circular dependency
+        // Import getFailureTreeProvider dynamically to avoid a circular dependency
+        // with extension.ts. A static ES import would create the cycle; a real
+        // dynamic import() would force this method (and its one caller) to become
+        // async. CommonJS require() here is intentional, not an oversight.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
         const ext = require('../extension');
         const failureTreeProvider = ext.getFailureTreeProvider();
         if (failureTreeProvider) {
@@ -310,7 +314,7 @@ export class TestExecutor {
                             passed: code === 0,
                             message: code === 0 ? 'All tests passed' : `Tests failed with exit code ${code}`,
                             duration: duration,
-                            output: output
+                            output: output + errorOutput
                         };
                     } else {
                         // Try listener output first - it has the most accurate line numbers
@@ -323,7 +327,7 @@ export class TestExecutor {
                             testResult = {
                                 ...listenerResult,
                                 duration: duration,
-                                output: output
+                                output: output + errorOutput
                             };
                         } else {
                             this.outputChannel.appendLine(`[DEBUG] Listener result not found, falling back to XML parsing`);
@@ -339,7 +343,7 @@ export class TestExecutor {
                                     testResult = {
                                         ...textResult,
                                         duration: duration,
-                                        output: output
+                                        output: output + errorOutput
                                     };
                                 } else {
                                     // Ultimate fallback: use exit code
@@ -347,7 +351,7 @@ export class TestExecutor {
                                         passed: code === 0,
                                         message: code === 0 ? 'Test passed' : `Test failed with exit code ${code}`,
                                         duration: duration,
-                                        output: output
+                                        output: output + errorOutput
                                     };
                                 }
                             }
@@ -359,7 +363,7 @@ export class TestExecutor {
                         passed: code === 0,
                         message: code === 0 ? 'Test passed' : `Test failed with exit code ${code}`,
                         duration: duration,
-                        output: output
+                        output: output + errorOutput
                     };
                 }
 

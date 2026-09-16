@@ -126,7 +126,7 @@ export class StackTraceFormatter {
         const parts: string[] = [];
 
         for (const frame of sortedStack) {
-            if (!frame.source) continue;
+            if (!frame.source) {continue;}
 
             const displayName = frame.kwname || frame.name;
             if (frame.is_failure_point) {

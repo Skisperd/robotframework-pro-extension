@@ -9,7 +9,7 @@ export class RobotRenameProvider implements vscode.RenameProvider {
         position: vscode.Position,
         _token: vscode.CancellationToken
     ): vscode.ProviderResult<vscode.Range | { range: vscode.Range; placeholder: string }> {
-        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-\.]+/);
+        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-.]+/);
         if (!wordRange) {
             throw new Error('Cannot rename this element');
         }
@@ -17,7 +17,7 @@ export class RobotRenameProvider implements vscode.RenameProvider {
         const word = document.getText(wordRange).trim();
 
         // Check if it's something we can rename
-        const isVariable = word.match(/^[\$@&]\{[^}]+\}$/);
+        const isVariable = word.match(/^[$@&]\{[^}]+\}$/);
         const isKeyword = this.indexer.findKeyword(word).length > 0;
 
         if (!isVariable && !isKeyword) {
@@ -33,7 +33,7 @@ export class RobotRenameProvider implements vscode.RenameProvider {
         newName: string,
         _token: vscode.CancellationToken
     ): Promise<vscode.WorkspaceEdit | undefined> {
-        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-\.]+/);
+        const wordRange = document.getWordRangeAtPosition(position, /[\w\s\-.]+/);
         if (!wordRange) {
             return undefined;
         }
@@ -42,7 +42,7 @@ export class RobotRenameProvider implements vscode.RenameProvider {
         const workspaceEdit = new vscode.WorkspaceEdit();
 
         // Check if it's a variable
-        if (oldName.match(/^[\$@&]\{[^}]+\}$/)) {
+        if (oldName.match(/^[$@&]\{[^}]+\}$/)) {
             await this.renameVariable(oldName, newName, workspaceEdit);
         } else {
             // It's a keyword
@@ -80,7 +80,7 @@ export class RobotRenameProvider implements vscode.RenameProvider {
     ): Promise<void> {
         // Ensure new name has proper variable syntax
         let formattedNewName = newName;
-        if (!newName.match(/^[\$@&]\{[^}]+\}$/)) {
+        if (!newName.match(/^[$@&]\{[^}]+\}$/)) {
             const prefix = oldName.charAt(0); // Get $, @, or &
             formattedNewName = `${prefix}{${newName}}`;
         }
@@ -114,7 +114,7 @@ export class RobotRenameProvider implements vscode.RenameProvider {
             const line = lines[i];
 
             // Use case-insensitive matching for keywords (Robot Framework standard)
-            const isVariable = oldName.match(/^[\$@&]\{[^}]+\}$/);
+            const isVariable = oldName.match(/^[$@&]\{[^}]+\}$/);
             const regex = isVariable
                 ? new RegExp(this.escapeRegex(oldName), 'g')
                 : new RegExp(`\\b${this.escapeRegex(oldName)}\\b`, 'gi');
